@@ -124,13 +124,18 @@ def human(n: int | float | None) -> str:
 _BAD_CHARS = re.compile(r'[\x00-\x1f\\:*?"<>|]')
 
 
+_WIN_RESERVED = {"CON", "PRN", "AUX", "NUL", *(f"COM{i}" for i in range(1, 10)), *(f"LPT{i}" for i in range(1, 10))}
+
+
 def safe_component(name: str) -> str:
     name = unicodedata.normalize("NFC", name)
     name = _BAD_CHARS.sub("_", name).strip().rstrip(".")
     if name in ("", ".", ".."):
         name = "_"
-    # Keep each path component well under common 255-byte limits.
-    while len(name.encode("utf-8")) > 200:
+    if name.split(".")[0].upper() in _WIN_RESERVED:
+        name = "_" + name
+    # Keep components short: Windows paths are limited to 260 characters.
+    while len(name.encode("utf-8")) > 120:
         stem, dot, ext = name.rpartition(".")
         if dot and len(ext) < 10 and stem:
             name = stem[:-1] + "." + ext

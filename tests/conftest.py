@@ -24,6 +24,7 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setenv("MINSKY_MIN_ALDER", "0")
     monkeypatch.setenv("MINSKY_KONFIG", str(tmp_path / "innstillinger.json"))
     monkeypatch.setenv("HOME", str(tmp_path / "hjem"))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path / "hjem"))
     monkeypatch.setenv("FAKE_LIB", str(lib))
     monkeypatch.setenv("FAKE_INCLOUD", "1")
     ws = Workspace()

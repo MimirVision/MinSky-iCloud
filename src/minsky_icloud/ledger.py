@@ -54,7 +54,6 @@ CREATE TABLE IF NOT EXISTS items (
     attempts       INTEGER NOT NULL DEFAULT 0,
     last_error     TEXT,
     force_import   INTEGER NOT NULL DEFAULT 0,
-    selected       INTEGER NOT NULL DEFAULT 1, -- 0 = user chose not to move it
     import_started TEXT,
     imported_at    TEXT,
     verified_at    TEXT,
@@ -96,9 +95,21 @@ IKKE_MEDIA = "ikke_media"        # not a photo/video; kept in the archive only
 FEIL = "feil"                    # Photos refused it several times
 AVVIK = "avvik"                  # the copy in Photos differs; needs a look
 I_PAPIRKURV = "i_papirkurv"      # someone deleted it in Photos ('Nylig slettet')
+SENDT = "sendt"                  # Windows: placed in the iCloud Photos folder, waiting for iCloud to confirm
 
-ALL_STATES = [ARKIVERT, IMPORTERER, IMPORTERT, BEKREFTET, I_ICLOUD,
+ALL_STATES = [ARKIVERT, IMPORTERER, IMPORTERT, SENDT, BEKREFTET, I_ICLOUD,
               IKKE_MEDIA, FEIL, AVVIK, I_PAPIRKURV]
+
+
+# Columns added after version 1.0 (Windows: what was put in the iCloud folder).
+MIGRATIONS = [
+    ("selected", "INTEGER NOT NULL DEFAULT 1"),
+    ("upload_name", "TEXT"),      # file name used in the iCloud Photos folder
+    ("upload_size", "INTEGER"),   # size of what was sent (differs from size when converted)
+    ("upload_sha", "TEXT"),
+    ("converted", "INTEGER NOT NULL DEFAULT 0"),  # HEIC sent as high-quality JPEG
+    ("sent_at", "TEXT"),
+]
 
 
 class Ledger:
@@ -113,8 +124,9 @@ class Ledger:
         self.db.execute("PRAGMA foreign_keys=ON")
         self.db.executescript(SCHEMA)
         cols = {r[1] for r in self.db.execute("PRAGMA table_info(items)")}
-        if "selected" not in cols:  # databases from version 1.0
-            self.db.execute("ALTER TABLE items ADD COLUMN selected INTEGER NOT NULL DEFAULT 1")
+        for col, decl in MIGRATIONS:
+            if col not in cols:  # databases from older versions
+                self.db.execute(f"ALTER TABLE items ADD COLUMN {col} {decl}")
         cur = self.get_meta("schema_version")
         if cur is None:
             self.set_meta("schema_version", str(SCHEMA_VERSION))

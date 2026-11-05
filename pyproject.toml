@@ -8,7 +8,12 @@ dynamic = ["version"]
 description = "Flytt bilder og videoer fra Telenor Min Sky til iCloud-bilder – trygt og gjenopptakbart."
 readme = "README.md"
 requires-python = ">=3.9"
-dependencies = []
+dependencies = [
+    # Windows only: read the iCloud library (to verify uploads) and convert HEIC to JPEG
+    'pyicloud>=2026.10.1; sys_platform == "win32" and python_version >= "3.10"',
+    'pillow-heif>=1.0; sys_platform == "win32"',
+    'Pillow>=10; sys_platform == "win32"',
+]
 
 [project.scripts]
 minsky-icloud = "minsky_icloud.cli:main"

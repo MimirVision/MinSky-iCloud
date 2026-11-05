@@ -36,6 +36,7 @@ class Workspace:
         self.tmp = self.archive / ".tmp"
         self.reports = self.root / "rapporter"
         self.logs = self.root / "logg"
+        self.converted = self.root / "konvertert"  # Windows: HEIC converted to JPEG for iCloud
         self.db_path = self.root / "flytting.db"
         self.lock_path = self.root / ".lås"
         self._local = threading.local()     # one database connection per thread

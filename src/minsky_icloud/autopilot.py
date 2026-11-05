@@ -28,8 +28,10 @@ import zipfile
 from pathlib import Path
 from typing import Callable
 
+from . import config
 from . import ledger as L
 from . import photos as P
+from . import winsend as W
 from .ingest import ingest
 from .report import gather
 from .util import PARTIAL_SUFFIXES, fix_zip_name, is_media, is_noise, now_iso
@@ -44,10 +46,31 @@ MIN_MEDIA_SHARE = 0.8       # a zip must be mostly photos/videos to be picked up
 
 
 def notify(title: str, text: str) -> None:
+    if sys.platform.startswith("win"):
+        _notify_windows(title, text)
+        return
     if sys.platform != "darwin":
         return
     script = f'display notification {_q(text)} with title {_q(title)} sound name "Glass"'
     subprocess.run(["osascript", "-e", script], check=False, capture_output=True)
+
+
+def _notify_windows(title: str, text: str) -> None:
+    ps = (
+        "Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing;"
+        "$n = New-Object System.Windows.Forms.NotifyIcon; $n.Icon = [System.Drawing.SystemIcons]::Information;"
+        f"$n.BalloonTipTitle = {_ps(title)}; $n.BalloonTipText = {_ps(text)}; $n.Visible = $true;"
+        "$n.ShowBalloonTip(10000); Start-Sleep -Seconds 10; $n.Dispose()"
+    )
+    try:
+        subprocess.Popen(["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", ps],
+                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    except OSError:
+        pass
+
+
+def _ps(s: str) -> str:
+    return "'" + s.replace("'", "''") + "'"
 
 
 def _q(s: str) -> str:
@@ -63,11 +86,19 @@ class KeepAwake:
     def __enter__(self):
         if sys.platform == "darwin" and shutil.which("caffeinate"):
             self.proc = subprocess.Popen(["caffeinate", "-i", "-s", "-w", str(os.getpid())])
+        elif sys.platform.startswith("win"):
+            import ctypes  # ES_CONTINUOUS | ES_SYSTEM_REQUIRED: no sleep while this thread runs
+
+            ctypes.windll.kernel32.SetThreadExecutionState(0x80000000 | 0x00000001)
         return self
 
     def __exit__(self, *exc):
         if self.proc:
             self.proc.terminate()
+        elif sys.platform.startswith("win"):
+            import ctypes
+
+            ctypes.windll.kernel32.SetThreadExecutionState(0x80000000)
 
 
 def downloads_dir() -> Path:
@@ -131,9 +162,15 @@ def pending_selected(ws: Workspace) -> int:
     ).fetchone()[0]
 
 
-def run(ws: Workspace, *, osxphotos: list[str], settings: dict,
+def run(ws: Workspace, *, osxphotos: list[str] | None = None, settings: dict,
         phase: Callable[[str], None] = lambda s: None, once: bool = False,
-        idle_sleep: float = IDLE_SLEEP, verify_every: float = VERIFY_EVERY) -> None:
+        idle_sleep: float | None = None, verify_every: float = VERIFY_EVERY,
+        icloud=None, index: "W.Index | None" = None) -> None:
+    windows = config.target() == "windows"
+    if windows and index is None:
+        index = W.Index()
+    if idle_sleep is None:
+        idle_sleep = IDLE_SLEEP
     started = time.time()
     since = settings.get("nedlastinger_fra") or started
     last_verify = 0.0
@@ -149,16 +186,19 @@ def run(ws: Workspace, *, osxphotos: list[str], settings: dict,
             ingest(ws)
 
             imported = False
-            if pending_selected(ws):
-                phase("Legger bilder inn i Bilder-appen")
-                P.import_to_photos(ws, osxphotos=osxphotos, batch_size=int(settings.get("gruppe") or 500),
-                                   limit=ROUND_LIMIT, album=settings.get("album") or None)
-                imported = True
-
-            if imported or time.time() - last_verify >= verify_every:
-                phase("Sjekker bildene i Bilder og iCloud")
-                P.verify_in_photos(ws, osxphotos=osxphotos)
-                last_verify = time.time()
+            if windows:
+                imported = W.round_(ws, icloud, settings, index, phase, limit=ROUND_LIMIT,
+                                    force_scan=index.when == 0)["sent"] > 0
+            else:
+                if pending_selected(ws):
+                    phase("Legger bilder inn i Bilder-appen")
+                    P.import_to_photos(ws, osxphotos=osxphotos, batch_size=int(settings.get("gruppe") or 500),
+                                       limit=ROUND_LIMIT, album=settings.get("album") or None)
+                    imported = True
+                if imported or time.time() - last_verify >= verify_every:
+                    phase("Sjekker bildene i Bilder og iCloud")
+                    P.verify_in_photos(ws, osxphotos=osxphotos)
+                    last_verify = time.time()
 
             g = gather(ws)
             c = g["counts"]
@@ -178,10 +218,13 @@ def run(ws: Workspace, *, osxphotos: list[str], settings: dict,
 
             if once:
                 return
-            if pending_selected(ws):
+            if windows and imported:
+                continue  # room for more in the iCloud folder
+            if not windows and pending_selected(ws):
                 continue  # more to import right away
-            phase("Venter på nye nedlastinger og på at iCloud blir ferdig med opplastingen"
-                  if c[L.BEKREFTET] else "Venter på nye nedlastinger fra Min Sky")
+            uploading = c[L.BEKREFTET] + c[L.SENDT]
+            phase("Venter på at iCloud blir ferdig med opplastingen (sjekker igjen om noen minutter)"
+                  if uploading else "Venter på nye nedlastinger fra Min Sky")
             end = time.time() + idle_sleep
             while time.time() < end:
                 ws.check_stop()

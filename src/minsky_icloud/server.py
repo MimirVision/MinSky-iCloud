@@ -32,6 +32,8 @@ from . import __version__, config, logsetup
 from . import autopilot as A
 from . import ledger as L
 from . import photos as P
+from . import winsend as W
+from .icloud import ICloud, NeedLogin
 from .ingest import ingest
 from .report import LABELS, check_archive, checklist, gather, next_step, write_reports
 from .util import IntegrityError, NotEnoughSpace, PARTIAL_SUFFIXES, Stopped, free_bytes, human
@@ -101,6 +103,11 @@ class App:
         self.phase = ""
         self._mac_info: dict | None = None
         self._dl_cache: dict[tuple, bool] = {}
+        self.target = config.target()
+        self.icloud = ICloud(config.icloud_session_dir())
+        self.index = W.Index()
+        if self.target == "windows":
+            threading.Thread(target=self.icloud.resume, daemon=True).start()
 
     # ---------------------------------------------------------------- jobs
     def start_job(self, name: str) -> str | None:
@@ -133,7 +140,9 @@ class App:
         result = "ok"
         log.info("▶ %s", self.JOBS[name])
         try:
-            if name == "autopilot":
+            if self.target == "windows" and name in ("autopilot", "prøverunde", "verifiser"):
+                self._run_windows(name)
+            elif name == "autopilot":
                 A.run(ws, osxphotos=self._osx(), settings=self.settings, phase=self._set_phase)
             elif name == "prøverunde":
                 osx = self._osx()
@@ -159,7 +168,7 @@ class App:
         except Stopped:
             result = "stoppet"
             log.warning("Satt på pause. Ingenting er tapt. Trykk «Start» for å fortsette.")
-        except (NotEnoughSpace, P.OsxphotosMissing, IntegrityError) as e:
+        except (NotEnoughSpace, P.OsxphotosMissing, IntegrityError, NeedLogin, W.UploadFolderMissing) as e:
             result = "feil"
             log.error(str(e))
             A.notify("Min Sky → iCloud", "Flyttingen stoppet. Åpne programmet for detaljer.")
@@ -175,6 +184,43 @@ class App:
                 self.last_job = {**(self.job or {}), "ended": time.time(), "result": result}
                 self.job = None
                 self.phase = ""
+
+    def _run_windows(self, name: str):
+        ws = self.ws
+        if name == "autopilot":
+            A.run(ws, settings=self.settings, phase=self._set_phase, icloud=self.icloud, index=self.index)
+        elif name == "prøverunde":
+            self._set_phase("Leser inn nedlastinger")
+            ingest(ws)
+            W.round_(ws, self.icloud, self.settings, self.index, self._set_phase, limit=20,
+                     force_scan=self.index.when == 0)
+            log.info("20 bilder ligger nå i iCloud-mappen. Når iCloud for Windows har lastet dem opp (vanligvis "
+                     "noen minutter), trykk «Sjekk iCloud nå». Se også etter dem på iCloud.com eller iPhone.")
+        elif name == "verifiser":
+            W.round_(ws, self.icloud, self.settings, self.index, self._set_phase, limit=0, force_scan=True)
+
+    def win_info(self) -> dict:
+        folder = W.find_upload_folder(self.settings)
+        lv = W.live_photo_videos(self.ws)
+        lv_selected = 0
+        if lv:
+            q = ",".join("?" * len(lv))
+            lv_selected = self.ws.ledger.db.execute(
+                f"SELECT COUNT(*) FROM items WHERE selected=1 AND sha256 IN ({q})", lv).fetchone()[0]
+        heic_waiting = self.ws.ledger.db.execute(
+            "SELECT COUNT(*) FROM items WHERE ext IN ('.heic','.heif') AND state=? AND selected=1",
+            (L.ARKIVERT,)).fetchone()[0]
+        return {
+            "icloud": self.icloud.state(),
+            "folder": str(folder) if folder else None,
+            "folder_chosen": self.settings.get("icloud_mappe"),
+            "candidates": [str(c) for c in W.upload_folder_candidates() if c.is_dir()],
+            "heic": self.settings.get("heic", "jpeg"),
+            "heic_waiting": heic_waiting,
+            "live_videos": len(lv), "live_videos_selected": lv_selected,
+            "library_count": self.index.count if self.index.when else None,
+            "library_read": time.strftime("%H:%M", time.localtime(self.index.when)) if self.index.when else None,
+        }
 
     # --------------------------------------------------------------- status
     def mac_info(self, refresh: bool = False) -> dict:
@@ -327,7 +373,9 @@ class App:
             "job": job,
             "last_job": last,
             "log": lines,
-            "mac": self.mac_info(),
+            "mac": self.mac_info() if self.target == "mac" else {"is_mac": False},
+            "platform": self.target,
+            "win": self.win_info() if self.target == "windows" else None,
         }
 
     def inbox_listing(self, sources) -> list[dict]:
@@ -409,6 +457,11 @@ class App:
         with self.ws.ledger.tx():
             if body.get("id"):
                 n = db.execute("UPDATE items SET selected=? WHERE sha256=?", (val, body["id"])).rowcount
+            elif body.get("livevideo"):
+                n = 0
+                for sha in W.live_photo_videos(self.ws):
+                    n += db.execute("UPDATE items SET selected=? WHERE sha256=? AND state=?",
+                                    (val, sha, L.ARKIVERT)).rowcount
             elif body.get("all"):
                 n = db.execute("UPDATE items SET selected=?", (val,)).rowcount
             else:
@@ -423,6 +476,13 @@ class App:
             self.settings["album"] = str(body["album"]).strip()[:100]
         if "gruppe" in body:
             self.settings["gruppe"] = max(10, min(2000, int(body["gruppe"])))
+        if "heic" in body and body["heic"] in ("jpeg", "hopp"):
+            self.settings["heic"] = body["heic"]
+        if "icloud_mappe" in body:
+            folder = str(body["icloud_mappe"] or "").strip().strip('"')
+            if folder and not Path(folder).is_dir():
+                raise ValueError("Fant ikke den mappen.")
+            self.settings["icloud_mappe"] = folder or None
         if "hent_fra_nedlastinger" in body:
             on = bool(body["hent_fra_nedlastinger"])
             self.settings["hent_fra_nedlastinger"] = on
@@ -485,7 +545,10 @@ class App:
         out = []
         cands = [Path.home()]
         vol = Path("/Volumes")
-        if vol.is_dir():
+        if sys.platform.startswith("win"):
+            # Other drives: USB disks and memory cards (D:, E:, …)
+            cands += [Path(f"{d}:\\") for d in "DEFGHIJKLMNOPQRSTUVWXYZ" if os.path.exists(f"{d}:\\")]
+        elif vol.is_dir():
             cands += [p for p in sorted(vol.iterdir()) if p.is_dir() and not p.name.startswith(".")]
         seen = set()
         for c in cands:
@@ -497,7 +560,8 @@ class App:
                 continue  # the system disk also shows up under /Volumes
             seen.add(dev)
             target = c / "MinSky-flytting"
-            out.append({"name": "Denne Mac-en" if c == Path.home() else c.name,
+            here = "Denne PC-en" if sys.platform.startswith("win") or config.target() == "windows" else "Denne Mac-en"
+            out.append({"name": here if c == Path.home() else (c.name or f"Disk {str(c)[:2]}"),
                         "path": str(target), "free": human(free_bytes(c)),
                         "current": self.ws.root == target.resolve()})
         return out
@@ -550,9 +614,26 @@ def _like_prefix(path: str) -> str:
     return esc + "/%"
 
 
+def _desktop() -> Path:
+    home = Path(os.environ.get("USERPROFILE") or Path.home())
+    for d in (home / "OneDrive" / "Desktop", home / "OneDrive" / "Skrivebord", home / "Desktop"):
+        if d.is_dir():
+            return d
+    return home / "Desktop"
+
+
 def make_shortcut() -> Path:
     """A double-clickable launcher on the Desktop."""
     import shlex
+
+    if sys.platform.startswith("win"):
+        exe = shutil.which("minsky-icloud")
+        cmd = f'"{exe}" app' if exe else f'"{sys.executable}" -m minsky_icloud app'
+        p = _desktop() / "Min Sky til iCloud.bat"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text("@echo off\r\ntitle Min Sky til iCloud\r\nrem La dette vinduet sta apent mens programmet brukes.\r\n"
+                     f"{cmd}\r\n", encoding="utf-8")
+        return p
 
     exe = shutil.which("minsky-icloud")
     cmd = shlex.quote(exe) if exe else f"{shlex.quote(sys.executable)} -m minsky_icloud"
@@ -660,7 +741,10 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json({"error": "Sett flyttingen på pause før du endrer utvalget."}, 409)
                 return self._json({"ok": True, "changed": app.select(body)})
             if path == "/api/settings":
-                app.save_settings(body)
+                try:
+                    app.save_settings(body)
+                except ValueError as e:
+                    return self._json({"error": str(e) or "ugyldig verdi"}, 400)
                 return self._json({"ok": True})
             if path == "/api/expected":
                 n = int(body.get("antall"))
@@ -683,6 +767,23 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"ok": True, "path": str(make_shortcut())})
             if path == "/api/open":
                 app.open_path(body.get("what", ""))
+                return self._json({"ok": True})
+            if path == "/api/icloud/login":
+                try:
+                    return self._json(app.icloud.login(str(body.get("apple_id", "")), str(body.get("password", ""))))
+                except NeedLogin as e:
+                    return self._json({"error": str(e)}, 400)
+            if path == "/api/icloud/code":
+                try:
+                    st = app.icloud.submit_code(str(body.get("code", "")))
+                    log.info("Logget inn i iCloud som %s.", st["apple_id"])
+                    return self._json(st)
+                except NeedLogin as e:
+                    return self._json({"error": str(e)}, 400)
+            if path == "/api/icloud/logout":
+                if app.job:
+                    return self._json({"error": "Sett flyttingen på pause først."}, 409)
+                app.icloud.logout()
                 return self._json({"ok": True})
             if path == "/api/recheck-mac":
                 return self._json(app.mac_info(refresh=True))

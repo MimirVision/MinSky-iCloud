@@ -186,6 +186,21 @@ code { font: 12.5px ui-monospace, SFMono-Regular, Menlo, monospace; background: 
   overflow: auto; font: 12.5px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; }
 .log .warning { color: var(--warn); } .log .error, .log .critical { color: var(--bad); }
 .log .t { color: var(--muted); }
+.setup { padding: 20px 22px; margin-top: 14px; }
+.setup h2 { font-size: 17px; margin: 0 0 4px; }
+.steps { display: grid; gap: 10px; margin-top: 14px; }
+.step { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--card2); }
+.step .n { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 13px; background: var(--line); color: var(--ink2); }
+.step.done .n { background: var(--ok); color: #fff; }
+.step.now { border-color: var(--accent); background: var(--accent-soft); }
+.step .body { flex: 1; min-width: 0; }
+.step .body small { display: block; color: var(--muted); }
+.form { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; align-items: center; }
+.form input[type=email], .form input[type=password], .form input[type=text] { width: 230px; max-width: 100%; }
+input[type=email], input[type=password] { font: inherit; padding: 8px 11px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink); }
+.radio { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; margin-top: 8px; cursor: pointer; }
+.radio input { margin-top: 3px; accent-color: var(--accent); }
+.radio small { display: block; color: var(--muted); }
 .foot { color: var(--muted); font-size: 12.5px; margin-top: 18px; text-align: center; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
@@ -227,7 +242,7 @@ code { font: 12.5px ui-monospace, SFMono-Regular, Menlo, monospace; background: 
       <div class="headline num-tab" id="headline">–</div>
       <div class="stats">
         <div class="stat"><div class="v num-tab" id="stDone">0</div><div class="k"><i style="background:var(--c-done)"></i>Trygt i iCloud</div></div>
-        <div class="stat"><div class="v num-tab" id="stPhotos">0</div><div class="k"><i style="background:var(--c-photos)"></i>I Bilder, lastes opp</div></div>
+        <div class="stat"><div class="v num-tab" id="stPhotos">0</div><div class="k"><i style="background:var(--c-photos)"></i><span id="lblPhotos">I Bilder, lastes opp</span></div></div>
         <div class="stat"><div class="v num-tab" id="stWait">0</div><div class="k"><i style="background:var(--c-wait)"></i>Venter på tur</div></div>
         <div class="stat"><div class="v num-tab" id="stBad">0</div><div class="k"><i style="background:var(--c-bad)"></i>Trenger tilsyn</div></div>
       </div>
@@ -240,6 +255,21 @@ code { font: 12.5px ui-monospace, SFMono-Regular, Menlo, monospace; background: 
   </section>
 
   <div id="alerts" aria-live="polite"></div>
+
+  <section class="card setup" id="winSetup" hidden aria-label="Koble til iCloud">
+    <h2>Koble til iCloud</h2>
+    <p class="lead" style="margin:0">Tre ting må være på plass før flyttingen kan starte. Du gjør det bare én gang.</p>
+    <div class="steps">
+      <div class="step" id="ws1"><span class="n">1</span><div class="body"><b>Installer iCloud for Windows og slå på «Bilder»</b>
+        <small>Hent «iCloud» fra Microsoft Store, logg inn, og huk av for <b>Bilder</b> og <b>iCloud-bilder</b>. Programmet laster opp gjennom Apples egen app.</small>
+        <div class="form"><a class="btn" href="ms-windows-store://pdp/?ProductId=9PKTQ5699M62">Åpne Microsoft Store ↗</a><button data-act="recheck-win">Sjekk igjen</button></div></div></div>
+      <div class="step" id="ws2"><span class="n">2</span><div class="body"><b>Logg inn med Apple-ID-en din her</b>
+        <small>Programmet bruker innloggingen til å se hva som allerede ligger i iCloud, og til å bekrefte at hvert bilde kom fram. Passordet lagres ikke.</small>
+        <div id="loginBox"></div></div></div>
+      <div class="step" id="ws3"><span class="n">3</span><div class="body"><b>iCloud-bilder-mappen</b>
+        <small id="folderText"></small></div></div>
+    </div>
+  </section>
 
   <div class="tabs" role="tablist">
     <button class="tab" role="tab" data-tab="hent">Last ned <span class="badge" id="bHent" hidden></span></button>
@@ -320,6 +350,24 @@ code { font: 12.5px ui-monospace, SFMono-Regular, Menlo, monospace; background: 
     <h3 style="margin-top:12px">Hvor skal arkivet ligge?</h3>
     <p class="lead">Arkivet trenger omtrent like mye plass som bildene. Med mye bilder er en ekstern disk ofte best. Settes før du starter.</p>
     <div class="vols" id="vols"></div>
+    <div id="winSettings" hidden>
+      <h3>iCloud</h3>
+      <dl class="kv">
+        <dt>Konto</dt><dd id="wAccount">–</dd>
+        <dt>iCloud-biblioteket</dt><dd id="wLibrary">–</dd>
+        <dt>iCloud-bilder-mappen</dt><dd><code id="wFolder">–</code>
+          <div class="form"><input type="text" id="wFolderInput" placeholder="C:\Users\…\Pictures\iCloud Photos\Uploads" aria-label="Sti til iCloud-bilder-mappen"><button id="wFolderSave">Bruk denne mappen</button></div>
+          <div style="color:var(--muted);font-size:13px">Finnes vanligvis automatisk. Hvis ikke: åpne Filutforsker, høyreklikk «iCloud Photos» → «Kopier som bane», og lim inn her.</div></dd>
+      </dl>
+      <h3>HEIC-bilder (iPhone-formatet)</h3>
+      <p class="lead">iCloud for Windows laster ikke opp HEIC. Velg hva programmet skal gjøre med dem. Originalene ligger uansett urørt i arkivet.</p>
+      <label class="radio"><input type="radio" name="heic" value="jpeg"><span><b>Gjør om til JPEG i høy kvalitet (anbefalt)</b>
+        <small>Kvalitet 95 med full fargeoppløsning. Dato, sted og fargeprofil beholdes. Forskjellen er ikke synlig på skjerm.</small></span></label>
+      <label class="radio"><input type="radio" name="heic" value="hopp"><span><b>La HEIC-bildene ligge i arkivet</b>
+        <small>Flytt dem senere i originalformat med en Mac eller iPhone. Sjekklisten sier NEI til de er flyttet.</small></span></label>
+      <div id="liveBox"></div>
+    </div>
+    <div id="macSettings">
     <h3>Bilder og iCloud</h3>
     <dl class="kv">
       <dt>iCloud-konto på denne Mac-en</dt><dd id="appleId">–</dd>
@@ -327,8 +375,10 @@ code { font: 12.5px ui-monospace, SFMono-Regular, Menlo, monospace; background: 
       <dt>Album i Bilder</dt><dd><input type="text" id="album" aria-label="Albumnavn"> <button id="saveAlbum">Lagre</button></dd>
       <dt>Bilder per runde</dt><dd><input type="number" id="gruppe" min="10" max="2000" style="width:100px" aria-label="Bilder per runde"> <button id="saveGruppe">Lagre</button>
         <div style="color:var(--muted);font-size:13px">500 er raskest for store samlinger. Lavere tall gir hyppigere fremdrift.</div></dd>
-      <dt>Arbeidsmappe</dt><dd><code id="root"></code></dd>
     </dl>
+    </div>
+    <h3>Arbeidsmappe</h3>
+    <p><code id="root"></code></p>
     <h3>Snarvei</h3>
     <div class="row"><button id="shortcut">Lag snarvei på skrivebordet</button><span style="color:var(--muted);font-size:13px">Dobbeltklikk på snarveien for å starte programmet senere.</span></div>
   </section>
@@ -396,7 +446,9 @@ function ring(id, from, frac) {
 
 function render(s) {
   const c = s.counts, sel = s.selected || 0, prob = c.feil + c.avvik + c.i_papirkurv;
-  const inPhotos = c.importert + c.bekreftet + c.importerer, wait = Math.max(0, s.pending - c.importerer);
+  const inPhotos = c.importert + c.bekreftet + c.importerer + c.sendt, wait = Math.max(0, s.pending - c.importerer);
+  const win = s.platform === "windows", canRun = win ? !!(s.win.icloud.logged_in && s.win.folder) : s.mac.is_mac;
+  $("lblPhotos").textContent = win ? "Sendt, lastes opp" : "I Bilder, lastes opp";
   const f = (n) => sel ? n / sel : 0;
   ring("segDone", 0, f(s.done)); ring("segPhotos", f(s.done), f(inPhotos)); ring("segBad", f(s.done + inPhotos), f(prob));
   const pct = sel ? Math.floor(100 * s.done / sel) : 0;
@@ -410,15 +462,15 @@ function render(s) {
   $("phase").innerHTML = job ? `<span class="spin"></span>${esc(job.stopping ? "Setter på pause ved neste trygge punkt …" : (job.phase || job.title))}`
     : (s.safe ? "✓ Alt er flyttet og kontrollert." : sel && s.done === sel ? "Alle valgte bilder er i iCloud." : "");
   const m = s.metrics;
-  $("eta").textContent = auto && m.rate ? `${fmt(m.rate)} bilder i minuttet` + (m.eta ? ` · ${m.eta < 60 ? "under ett minutt" : "ca. " + dur(m.eta)} igjen til alt er i Bilder` : "") + " · Mac-en holdes våken"
-    : auto ? "Mac-en holdes våken mens autopiloten går. Du kan lukke nettleseren, men la programvinduet stå." :
-    (sel && s.pending ? `${fmt(s.pending)} bilder venter på å bli lagt inn i Bilder.` : "");
+  $("eta").textContent = auto && m.rate ? `${fmt(m.rate)} bilder i minuttet` + (m.eta ? ` · ${m.eta < 60 ? "under ett minutt" : "ca. " + dur(m.eta)} igjen til alt er ${win ? "sendt" : "i Bilder"}` : "") + ` · ${win ? "maskinen" : "Mac-en"} holdes våken`
+    : auto ? `${win ? "Maskinen" : "Mac-en"} holdes våken mens autopiloten går. Du kan lukke nettleseren, men la programvinduet stå.` :
+    (sel && s.pending ? `${fmt(s.pending)} bilder venter på tur.` : "");
 
   const mb = $("mainBtn");
   if (auto) { mb.textContent = job.stopping ? "Setter på pause …" : "Sett på pause"; mb.disabled = job.stopping; mb.dataset.act = "stop"; }
-  else { mb.textContent = s.done && s.done < sel ? "▶ Fortsett" : "▶ Start"; mb.disabled = !!job || !s.mac.is_mac; mb.dataset.act = "start"; }
+  else { mb.textContent = s.done && s.done < sel ? "▶ Fortsett" : "▶ Start"; mb.disabled = !!job || !canRun; mb.dataset.act = "start"; }
   document.querySelectorAll("[data-job]").forEach(b => b.disabled = !!job);
-  $("trialBtn").hidden = s.done > 0 || !s.media_unique; $("trialBtn").disabled = !!job || !s.mac.is_mac;
+  $("trialBtn").hidden = s.done > 0 || !s.media_unique; $("trialBtn").disabled = !!job || !canRun;
 
   const pill = $("pill");
   if (job) { pill.className = "pill run"; $("pillText").textContent = auto ? "Autopilot kjører" : job.title; }
@@ -444,7 +496,10 @@ function badge(id, v) { const b = $(id); b.hidden = !v; if (v) { b.textContent =
 function renderAlerts(s, prob) {
   const a = [];
   const m = s.mac;
-  if (!m.is_mac) a.push(["warn", "💻", "Dette er ikke en Mac. Du kan lese inn og velge bilder her, men selve flyttingen til iCloud må gjøres på en Mac."]);
+  if (s.platform === "windows") {
+    const W = s.win;
+    if (W.icloud.logged_in && W.folder && W.heic === "hopp" && W.heic_waiting) a.push(["info", "🖼️", `${fmt(W.heic_waiting)} HEIC-bilder blir liggende i arkivet (valgt under Innstillinger).`]);
+  }
   else if (!m.osxphotos) a.push(["bad", "🔌", "<b>Koblingen til Bilder-appen mangler.</b> Kjør «Installer.command» på nytt, eller <code>pipx install osxphotos</code> i Terminal.",
     `<button data-act="recheck">Sjekk igjen</button>`]);
   const lj = s.last_job;
@@ -477,10 +532,41 @@ function renderKontroll(s) {
   if (document.activeElement !== $("expected") && s.expected != null) $("expected").value = s.expected;
   $("problems").innerHTML = s.problems.length ? `<h3>Trenger tilsyn</h3><div class="list">${s.problems.map(p =>
     `<div class="it"><span class="name" title="${esc(p.path)}">${esc(p.path.split("/").pop())}</span><span class="meta hide-m">${esc(p.error || "")}</span>${chip([p.state, "bad"])}</div>`).join("")}</div>
-    <p style="color:var(--muted);font-size:13px">Filene ligger i arkivet. Du kan dra dem rett inn i Bilder, eller prøve igjen med «Start».</p>` : "";
+    <p style="color:var(--muted);font-size:13px">Filene ligger i arkivet. Du kan prøve igjen med «Start», eller legge dem inn manuelt.</p>` : "";
+}
+
+function renderWindows(s) {
+  const W = s.win, win = s.platform === "windows";
+  $("winSettings").hidden = !win; $("macSettings").hidden = win;
+  if (!win) { $("winSetup").hidden = true; return; }
+  const ic = W.icloud, folderOk = !!W.folder;
+  $("winSetup").hidden = ic.logged_in && folderOk;
+  const step = (id, done, now) => { $(id).className = "step" + (done ? " done" : now ? " now" : ""); };
+  step("ws1", folderOk, !folderOk); step("ws2", ic.logged_in, folderOk && !ic.logged_in); step("ws3", folderOk, false);
+  const lb = $("loginBox");
+  const want = ic.logged_in ? "in" : ic.needs_code ? "code" : "login";
+  if (lb.dataset.mode !== want) {
+    lb.dataset.mode = want;
+    lb.innerHTML = want === "in" ? `<div class="form">${chip(["Logget inn", "ok"])} ${esc(ic.apple_id)}</div>`
+      : want === "code" ? `<form class="form" id="codeForm"><input type="text" id="code" inputmode="numeric" autocomplete="one-time-code" placeholder="6-sifret kode" aria-label="Kode fra Apple" style="width:150px">
+          <button class="primary">Bekreft</button><span style="color:var(--muted);font-size:13px">Skriv inn koden Apple sendte til iPhonen din.</span></form>`
+      : `<form class="form" id="loginForm"><input type="email" id="appleIdInput" autocomplete="username" placeholder="Apple-ID (e-post)" aria-label="Apple-ID" value="${esc(ic.apple_id || "")}">
+          <input type="password" id="applePw" autocomplete="current-password" placeholder="Passord" aria-label="Passord"><button class="primary">Logg inn</button></form>`;
+  }
+  $("folderText").innerHTML = folderOk ? `Funnet: <code>${esc(W.folder)}</code>` : "Ikke funnet ennå. Den dukker opp når iCloud for Windows er installert og «Bilder» er slått på. Du kan også velge den under Innstillinger.";
+  $("wAccount").innerHTML = ic.logged_in ? `${esc(ic.apple_id)} <button class="link" data-act="logout">Logg ut</button>`
+    : ic.needs_code ? "Venter på kode fra Apple" : `Ikke logget inn <button class="link" data-act="show-setup">Logg inn</button>`;
+  $("wLibrary").textContent = W.library_count != null ? `${fmt(W.library_count)} bilder og videoer (lest kl. ${W.library_read})` : "Leses når flyttingen starter";
+  $("wFolder").textContent = W.folder || "Ikke funnet";
+  document.querySelectorAll('input[name=heic]').forEach(r => { r.checked = r.value === W.heic; });
+  $("liveBox").innerHTML = W.live_videos ? `<h3>Live Photos</h3><p class="lead">${fmt(W.live_videos)} bilder er Live Photos, der bevegelsen ligger i en egen kort video (.MOV).
+     Fra Windows blir videodelen et eget klipp i iCloud. ${W.live_videos_selected ? `${fmt(W.live_videos_selected)} er valgt nå.` : "Videoene er valgt bort og ligger i arkivet."}</p>
+     <div class="row">${W.live_videos_selected ? `<button data-act="live-off">Velg bort videodelen (behold bildet)</button>` : `<button data-act="live-on">Ta med videodelen som egne klipp</button>`}</div>` : "";
 }
 
 function renderSettings(s) {
+  renderWindows(s);
+  if (s.platform === "windows") { $("root").textContent = s.root; return; }
   const m = s.mac;
   $("appleId").textContent = m.is_mac ? (m.apple_id || "Ikke funnet – logg inn i Systeminnstillinger") : "Krever Mac";
   $("osx").innerHTML = m.osxphotos ? `${chip(["Klar", "ok"])} <span style="color:var(--muted);font-size:13px">${esc(m.osxphotos)}</span>` : chip(["Mangler", "bad"]);
@@ -561,6 +647,10 @@ document.addEventListener("click", async (e) => {
   if (t.dataset.tabGo) return showTab(t.dataset.tabGo);
   if (t.dataset.act === "take") { await api("/api/take-downloads", { names: S.downloads.map(d => d.name) }); return poll(); }
   if (t.dataset.act === "recheck") { await api("/api/recheck-mac", {}); return poll(); }
+  if (t.dataset.act === "recheck-win") return poll();
+  if (t.dataset.act === "logout") { if (confirm("Logge ut av iCloud i programmet?")) { await api("/api/icloud/logout", {}); $("loginBox").dataset.mode = ""; poll(); } return; }
+  if (t.dataset.act === "show-setup") { $("winSetup").hidden = false; return $("winSetup").scrollIntoView({ behavior: "smooth" }); }
+  if (t.dataset.act === "live-off" || t.dataset.act === "live-on") { await api("/api/select", { livevideo: true, selected: t.dataset.act === "live-on" }); treeKey = ""; return poll(); }
   if (t.dataset.vol) {
     let p = t.dataset.vol;
     if (p === "__annen") { p = prompt("Skriv inn stien til mappen som skal brukes:", S ? S.root : ""); if (!p) return; }
@@ -568,8 +658,18 @@ document.addEventListener("click", async (e) => {
     const r = await api("/api/workspace", { path: p }); if (r.ok) { treeKey = ""; logSeq = 0; $("log").innerHTML = ""; loadVols(); poll(); }
   }
 });
+document.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = e.target, btn = f.querySelector("button");
+  btn.disabled = true; btn.textContent = "Vent …";
+  if (f.id === "loginForm") await api("/api/icloud/login", { apple_id: $("appleIdInput").value, password: $("applePw").value });
+  if (f.id === "codeForm") await api("/api/icloud/code", { code: $("code").value });
+  $("loginBox").dataset.mode = ""; poll();
+});
+$("wFolderSave").onclick = async () => { const r = await api("/api/settings", { icloud_mappe: $("wFolderInput").value }); if (r.ok) { $("wFolderInput").value = ""; poll(); } };
 document.addEventListener("change", async (e) => {
   const t = e.target;
+  if (t.name === "heic") { await api("/api/settings", { heic: t.value }); return poll(); }
   if (t.id === "autoDl") { await api("/api/settings", { hent_fra_nedlastinger: t.checked }); return poll(); }
   if (t.dataset.path !== undefined) await api("/api/select", { path: t.dataset.path, selected: t.checked });
   else if (t.dataset.id) { await api("/api/select", { id: t.dataset.id, selected: t.checked }); t.closest(".tile").classList.toggle("off", !t.checked); }

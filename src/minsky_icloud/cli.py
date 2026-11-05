@@ -10,7 +10,7 @@ import subprocess
 import sys
 
 from . import __version__
-from . import logsetup
+from . import config, logsetup
 from . import photos as P
 from .ingest import ingest
 from .report import check_archive, print_status, write_reports
@@ -125,6 +125,8 @@ def _dispatch(ws: Workspace, args) -> int:
     if cmd == "kontroller-arkiv":
         return 0 if check_archive(ws) else 1
 
+    if config.target() == "windows":
+        return _windows_cli(ws, cmd)
     P.require_macos()
     osx = P.find_osxphotos(args.osxphotos)
     if cmd == "importer":
@@ -151,6 +153,24 @@ def _do_import(ws, osx, args):
         ws, osxphotos=osx, batch_size=args.gruppe, limit=args.antall,
         album=args.album or None, retry_failed=args.retry,
     )
+
+
+def _windows_cli(ws: Workspace, cmd: str) -> int:
+    """On Windows the iCloud login happens in the app; the CLI reuses that session."""
+    from . import autopilot as A
+    from . import winsend as W
+    from .icloud import ICloud
+
+    ic = ICloud(config.icloud_session_dir())
+    if not ic.resume():
+        log.error("Logg inn i iCloud i programmet først (minsky-icloud app → Innstillinger).")
+        return 2
+    settings = config.load()
+    if cmd == "verifiser":
+        W.round_(ws, ic, settings, W.Index(), lambda s: None, limit=0, force_scan=True)
+    else:
+        A.run(ws, settings=settings, icloud=ic, once=True)
+    return 0 if print_status(ws) else 1
 
 
 def doctor(ws: Workspace, args) -> int:

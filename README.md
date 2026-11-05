@@ -3,12 +3,13 @@
 Et verktøy som flytter alle bilder og videoer fra **Telenor Min Sky** til **iCloud-bilder**,
 og som er laget for at **ingenting skal kunne gå tapt** underveis, selv om det stopper midt i.
 
+Programmet virker på **Windows** og **Mac**:
+
 ```
- Min Sky (nett)            Mac-en din                                       iCloud
-┌──────────────┐  zip   ┌─────────┐  kontroll  ┌────────┐ import ┌────────┐ Apple  ┌────────┐
-│ min-sky.no   │ ─────▶ │ innboks │ ─────────▶ │ arkiv  │ ─────▶ │ Bilder │ ─────▶ │ iCloud │
-└──────────────┘        └─────────┘  SHA-256   └────────┘        └────────┘        └────────┘
-     urørt                  urørt      permanent kopi       kontrollert mot arkivet   bekreftet
+Windows:  min-sky.no ─zip─▶ innboks ─kontroll─▶ arkiv ─(HEIC→JPEG)─▶ iCloud-bilder-mappen ─iCloud for Windows─▶ iCloud
+                                                                                    bekreftet ved å lese iCloud-biblioteket ◀─┘
+Mac:      min-sky.no ─zip─▶ innboks ─kontroll─▶ arkiv ──────────────▶ Bilder-appen ─────────────────────────────▶ iCloud
+                                                                       kontrollert byte for byte mot arkivet
 ```
 
 ## Slik er det sikret at ingenting blir borte
@@ -35,6 +36,36 @@ Til slutt får du en sjekkliste som svarer **JA** eller **NEI** på om det er tr
 
 ---
 
+## Kom i gang (Windows)
+
+1. Installer **iCloud** fra Microsoft Store. Logg inn, huk av for **Bilder**, trykk «Alternativer» og slå på
+   **iCloud-bilder**. Programmet laster opp gjennom Apples egen app.
+2. Last ned dette prosjektet som zip fra GitHub (grønn «Code»-knapp → «Download ZIP») og pakk det ut.
+3. Dobbeltklikk **`scripts\Installer.bat`**. Installerer den Python, ber den deg kjøre den én gang til. Den lager
+   en snarvei **«Min Sky til iCloud»** på skrivebordet og åpner programmet.
+4. I programmet: **logg inn med Apple-ID-en din** (med kode fra iPhonen). Programmet leser iCloud-biblioteket ditt
+   for å se hva som allerede er der, og for å bekrefte at hvert bilde kom fram. Passordet lagres ikke.
+
+![Oppsett på Windows](docs/windows-oppsett.png)
+
+### Dette er annerledes på Windows
+
+* **HEIC blir gjort om til JPEG.** iCloud for Windows laster ikke opp HEIC-bilder (iPhone-formatet). Programmet lager
+  derfor en JPEG i høy kvalitet: kvalitet 95, full fargeoppløsning, og dato, sted, kamera og fargeprofil beholdes.
+  Originalen ligger urørt i arkivet. Vil du heller ha originalene i iCloud, kan du velge «La HEIC-bildene ligge i
+  arkivet» og flytte dem senere med en Mac.
+* **Bilder som allerede er i iCloud, hoppes over.** Ligger bildet der allerede med samme filnavn, nøyaktig samme
+  størrelse og samme opptakstidspunkt, blir det ikke sendt igjen. Det skjer typisk fordi både Min Sky og iCloud tok
+  sikkerhetskopi av den samme iPhonen. Med 20 000 bilder kan det spare mange timer. Er programmet i tvil, for eksempel
+  fordi bildet mangler dato, sendes bildet likevel, fordi et duplikat er bedre enn et tap.
+* **Live Photos**: Videodelen (.MOV) blir et eget klipp i iCloud. Under Innstillinger kan du velge den bort og bare
+  beholde bildet. Videoene ligger uansett i arkivet.
+* **Kontrollen** skjer mot selve iCloud: et bilde regnes som ferdig først når det finnes i iCloud-biblioteket med det
+  navnet og den nøyaktige størrelsen programmet sendte. Filnavnet velges slik at det aldri kan forveksles med et
+  eldre bilde i iCloud. Kommer noe ikke fram innen et døgn, blir det flagget.
+* Er **«Avansert databeskyttelse»** slått på for Apple-ID-en, sperrer Apple denne lesetilgangen. Programmet sier fra
+  hvis det skjer.
+
 ## Kom i gang (Mac)
 
 1. Last ned dette prosjektet som zip fra GitHub (grønn «Code»-knapp → «Download ZIP») og pakk det ut.
@@ -53,10 +84,11 @@ Senere starter du programmet ved å dobbeltklikke snarveien. Det åpnes i nettle
 1. **Innstillinger**: Har du mange bilder, velger du en ekstern disk til arkivet først (se «Diskplass» under).
 2. **Last ned**: Slå på «Hent Min Sky-nedlastinger automatisk». Åpne min-sky.no i Chrome og last ned ett album
    eller én bunke om gangen. Zip-filene hentes selv fra Nedlastinger-mappen og kontrolleres.
-3. **Prøverunde med 20 bilder**: Se etter albumet «Fra Min Sky» i Bilder og sjekk at alt ser riktig ut.
-4. **Start**: Autopiloten legger bildene inn i Bilder, kontrollerer dem og sjekker iCloud-opplastingen. Den fortsetter
+3. **Prøverunde med 20 bilder**: På Mac ser du etter albumet «Fra Min Sky» i Bilder. På Windows sjekker du
+   iCloud.com eller iPhonen etter noen minutter. Se at bilder, datoer og videoer ser riktige ut.
+4. **Start**: Autopiloten sender bildene til iCloud (via Bilder-appen på Mac, eller iCloud for Windows), kontrollerer dem og sjekker iCloud-opplastingen. Den fortsetter
    så lenge du lar den gå. **Du kan fortsette å laste ned fra Min Sky mens den jobber**, og nye zip-filer blir
-   tatt med automatisk. Mac-en holdes våken, og du får et varsel når alt er ferdig eller noe trenger tilsyn.
+   tatt med automatisk. Maskinen holdes våken, og du får et varsel når alt er ferdig eller noe trenger tilsyn.
 5. **Velg bilder** (valgfritt): Fjern haken på mapper eller enkeltbilder du ikke vil ha med.
 6. **Kontroll**: Skriv inn hvor mange bilder Min Sky sier du har. Når sjekklisten sier **JA**, er alt trygt i iCloud.
 
@@ -92,13 +124,17 @@ Med 20 000 bilder trenger du plass til zip-filene, arkivet og Bilder-biblioteket
 * Slå på **«Optimaliser Mac-lagring»** i Bilder → Innstillinger → iCloud. Da sletter Bilder de lokale originalene
   etter at de er lastet opp til iCloud.
 
+På Windows tar også iCloud-bilder-mappen plass, til iCloud for Windows har lastet opp. Programmet sender derfor
+høyst 1500 bilder om gangen og venter til iCloud har tatt dem imot før det sender flere.
+
 Programmet varsler deg i god tid hvis plassen blir for liten, og stopper før disken blir full.
 
-## Hvorfor HEIC går via Bilder-appen
+## Hvorfor HEIC er et problem
 
 iCloud sin nettside (iCloud.com) og alle «direkte» iCloud-integrasjoner bruker Apples web-opplasting, og den tar
-**bare imot JPEG**. HEIC-bilder (iPhone-standarden), videoer og Live Photos blir avvist. Bilder-appen på Mac tar imot
-alt dette i original kvalitet, og laster det opp til iCloud selv. Derfor går programmet via Bilder-appen.
+**bare imot JPEG**. Ifølge brukerrapporter laster heller ikke iCloud for Windows opp HEIC-bilder, mens JPG, PNG og
+MOV går fint. Bare Bilder-appen på Mac (og iPhone/iPad) tar imot HEIC i originalformat.
+Derfor gjør programmet om HEIC til JPEG i høy kvalitet på Windows, og bruker Bilder-appen på Mac.
 
 ## Bruke Terminal i stedet
 
@@ -152,6 +188,7 @@ Når `status` sier **JA** og du har tatt en kopi av `arkiv/`, kan du slette `inn
 | `arkivert` | Trygt kopiert og kontrollert lokalt, venter på import |
 | `importerer` | Import påbegynt, fullføres ved neste kjøring |
 | `importert` | Ligger i Bilder, ikke kontrollert ennå |
+| `sendt` | Windows: lagt i iCloud-bilder-mappen, venter på at iCloud bekrefter |
 | `bekreftet` | Kopien i Bilder er identisk med arkivet, venter på iCloud-opplasting |
 | `i_icloud` | **Ferdig**: kontrollert og lastet opp til iCloud |
 | `ikke_media` | Ikke bilde eller video (ligger bare i arkivet) |

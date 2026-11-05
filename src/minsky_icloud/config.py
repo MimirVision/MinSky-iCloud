@@ -12,7 +12,25 @@ DEFAULTS = {
     "gruppe": 500,              # files per import round
     "hent_fra_nedlastinger": True,
     "nedlastinger_fra": None,   # only zips downloaded after this time are picked up
+    # Windows
+    "icloud_mappe": None,       # the iCloud Photos folder iCloud for Windows uploads from
+    "heic": "jpeg",             # "jpeg" = convert HEIC to high-quality JPEG, "hopp" = leave HEIC in the archive
+    "maks_ventende": 1500,      # files waiting in the iCloud folder before we pause sending
 }
+
+
+def icloud_session_dir() -> Path:
+    return path().parent / "icloud-økt"
+
+
+def target() -> str:
+    """'mac' (Photos app) or 'windows' (iCloud for Windows)."""
+    import sys
+
+    t = os.environ.get("MINSKY_PLATTFORM")
+    if t in ("mac", "windows"):
+        return t
+    return "windows" if sys.platform.startswith("win") else "mac"
 
 
 def path() -> Path:

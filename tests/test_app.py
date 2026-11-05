@@ -196,8 +196,11 @@ def test_switch_workspace(app, tmp_path):
 def test_shortcut(app):
     st, r = req(app, "POST", "/api/shortcut", {})
     p = r["path"]
-    assert p.endswith("Min Sky til iCloud.command") and os.access(p, os.X_OK)
-    assert open(p).read().rstrip().endswith(" app")
+    if p.endswith(".bat"):  # Windows
+        assert "app" in open(p).read()
+    else:
+        assert p.endswith("Min Sky til iCloud.command") and os.access(p, os.X_OK)
+        assert open(p).read().rstrip().endswith(" app")
 
 
 def test_one_job_at_a_time(app):

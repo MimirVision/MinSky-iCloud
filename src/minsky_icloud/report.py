@@ -18,6 +18,7 @@ LABELS = {
     L.ARKIVERT: "Arkivert lokalt, venter på import",
     L.IMPORTERER: "Import påbegynt (fullføres neste kjøring)",
     L.IMPORTERT: "I Bilder, ikke kontrollert ennå",
+    L.SENDT: "Lagt i iCloud-mappen, venter på at iCloud bekrefter",
     L.BEKREFTET: "I Bilder og kontrollert, venter på iCloud-opplasting",
     L.I_ICLOUD: "FERDIG: kontrollert og lastet opp til iCloud",
     L.IKKE_MEDIA: "Ikke bilde/video (bare i arkivet)",
@@ -58,7 +59,7 @@ def gather(ws: Workspace) -> dict:
 def checklist(g: dict) -> list[tuple[bool, str]]:
     c = g["counts"]
     broken = [s for s in g["sources"] if s["status"] != "ferdig"]
-    pending = c[L.ARKIVERT] - g["deselected"] + c[L.IMPORTERER] + c[L.IMPORTERT]  # BEKREFTET = checked, uploading
+    pending = c[L.ARKIVERT] - g["deselected"] + c[L.IMPORTERER] + c[L.IMPORTERT]  # BEKREFTET/SENDT = uploading
     problems = c[L.FEIL] + c[L.AVVIK] + c[L.I_PAPIRKURV]
     items = [
         (g["media_unique"] > 0, f"Bilder/videoer funnet i nedlastingene: {g['media_unique']}"),
@@ -101,7 +102,7 @@ def print_status(ws: Workspace) -> bool:
     p(f"Unike bilder/videoer: {g['media_unique']} ({human(g['media_bytes'])})"
       f"  – sett totalt {g['media_seen']} ganger i nedlastingene")
     p("")
-    for state in (L.I_ICLOUD, L.BEKREFTET, L.IMPORTERT, L.IMPORTERER, L.ARKIVERT,
+    for state in (L.I_ICLOUD, L.BEKREFTET, L.SENDT, L.IMPORTERT, L.IMPORTERER, L.ARKIVERT,
                   L.FEIL, L.AVVIK, L.I_PAPIRKURV, L.IKKE_MEDIA):
         if c[state]:
             p(f"  {c[state]:>7}  {LABELS[state]}")
