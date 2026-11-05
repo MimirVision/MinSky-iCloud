@@ -79,7 +79,7 @@ def ingest(ws: Workspace, *, min_age: float | None = None) -> IngestResult:
             age = time.time() - path.stat().st_mtime
         except FileNotFoundError:
             continue
-        if age < min_age:
+        if min_age > 0 and age < min_age:  # clocks may put a fresh file slightly in the future
             res.waiting.append(str(rel))
             continue
         if path.suffix.lower() == ".zip" or _looks_like_zip(path):

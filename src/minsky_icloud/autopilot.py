@@ -141,7 +141,7 @@ def pull_downloads(ws: Workspace, since: float, min_age: float | None = None) ->
             st = p.stat()
         except OSError:
             continue
-        if st.st_mtime < since or now - st.st_mtime < min_age:
+        if st.st_mtime < since or (min_age > 0 and now - st.st_mtime < min_age):
             continue
         if not looks_like_photo_zip(p):
             continue
