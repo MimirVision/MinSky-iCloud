@@ -66,7 +66,17 @@ def _import_args(p):
                    help="prøv filer som har feilet 3 ganger på nytt")
 
 
+def _utf8_console() -> None:
+    """Windows consoles default to cp1252, which cannot print «→ ✓ ─». Never crash on output."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
+
 def main(argv: list[str] | None = None) -> int:
+    _utf8_console()
     argv = list(sys.argv[1:] if argv is None else argv)
     argv = [ALIASES.get(a, a) for a in argv]
     ap = build_parser()
