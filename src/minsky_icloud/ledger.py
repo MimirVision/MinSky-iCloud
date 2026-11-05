@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS items (
     attempts       INTEGER NOT NULL DEFAULT 0,
     last_error     TEXT,
     force_import   INTEGER NOT NULL DEFAULT 0,
+    selected       INTEGER NOT NULL DEFAULT 1, -- 0 = user chose not to move it
     import_started TEXT,
     imported_at    TEXT,
     verified_at    TEXT,
@@ -103,13 +104,17 @@ ALL_STATES = [ARKIVERT, IMPORTERER, IMPORTERT, BEKREFTET, I_ICLOUD,
 class Ledger:
     def __init__(self, path: Path):
         self.path = path
-        self.db = sqlite3.connect(path, isolation_level=None, timeout=30)
+        # One connection per thread; check_same_thread=False only so close() can run from any thread.
+        self.db = sqlite3.connect(path, isolation_level=None, timeout=30, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
         # Durability first: WAL + full sync means a committed row survives a power cut.
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.execute("PRAGMA synchronous=FULL")
         self.db.execute("PRAGMA foreign_keys=ON")
         self.db.executescript(SCHEMA)
+        cols = {r[1] for r in self.db.execute("PRAGMA table_info(items)")}
+        if "selected" not in cols:  # databases from version 1.0
+            self.db.execute("ALTER TABLE items ADD COLUMN selected INTEGER NOT NULL DEFAULT 1")
         cur = self.get_meta("schema_version")
         if cur is None:
             self.set_meta("schema_version", str(SCHEMA_VERSION))

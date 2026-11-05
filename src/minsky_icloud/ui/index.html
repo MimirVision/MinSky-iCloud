@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Min Sky → iCloud</title>
+<style>
+:root {
+  --bg: #f5f5f7; --card: #ffffff; --ink: #1d1d1f; --muted: #6e6e73; --line: #e3e3e8;
+  --accent: #0a66d8; --accent-ink: #ffffff; --ok: #1a7f37; --warn: #b35900; --bad: #c4291c;
+  --ok-bg: #e8f5ec; --warn-bg: #fff4e5; --bad-bg: #fdecea; --chip: #eef0f4;
+  --s-done: #1a7f37; --s-verified: #5aa469; --s-imported: #8fb8ea; --s-pending: #c9ced6; --s-problem: #c4291c;
+  --shadow: 0 1px 2px rgba(0,0,0,.05), 0 4px 16px rgba(0,0,0,.04);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111113; --card: #1c1c1f; --ink: #f2f2f4; --muted: #a1a1a8; --line: #2e2e33;
+    --accent: #4c94ff; --accent-ink: #0b0b0c; --ok: #4cc26b; --warn: #f0a33a; --bad: #ff6b5e;
+    --ok-bg: #16301e; --warn-bg: #33260f; --bad-bg: #3a1714; --chip: #2a2a2f;
+    --s-done: #4cc26b; --s-verified: #2f7d45; --s-imported: #35619a; --s-pending: #3a3a40; --s-problem: #ff6b5e;
+    --shadow: none;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+main { max-width: 980px; margin: 0 auto; padding: 24px 16px 64px; }
+header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+h1 { font-size: 28px; margin: 0; letter-spacing: -.01em; }
+h1 span { color: var(--muted); font-weight: 400; }
+.sub { color: var(--muted); margin: 2px 0 0; }
+.overall { min-width: 260px; flex: 1; max-width: 420px; }
+.overall .big { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.bar { display: flex; height: 10px; border-radius: 6px; overflow: hidden; background: var(--s-pending); margin-top: 6px; }
+.bar > i { display: block; height: 100%; transition: width .4s; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--muted); margin-top: 6px; }
+.legend b { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: 0; }
+section.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px; margin: 14px 0; box-shadow: var(--shadow); }
+.step-h { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+.num { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--chip); font-weight: 600; font-size: 14px; }
+.num.done { background: var(--ok); color: #fff; }
+h2 { font-size: 18px; margin: 0; }
+p { margin: 6px 0; }
+.muted { color: var(--muted); }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+button, .btn { font: inherit; font-size: 14px; border-radius: 9px; border: 1px solid var(--line);
+  background: var(--card); color: var(--ink); padding: 8px 14px; cursor: pointer; text-decoration: none; display: inline-block; }
+button:hover:not(:disabled), .btn:hover { border-color: var(--muted); }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+button.danger { color: var(--bad); }
+button:disabled { opacity: .45; cursor: default; }
+button:focus-visible, .btn:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input[type=number], input[type=text] { font: inherit; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--bg); color: var(--ink); width: 150px; }
+.chip { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 99px; background: var(--chip); color: var(--muted); white-space: nowrap; }
+.chip.ok { background: var(--ok-bg); color: var(--ok); }
+.chip.warn { background: var(--warn-bg); color: var(--warn); }
+.chip.bad { background: var(--bad-bg); color: var(--bad); }
+.list { margin: 12px 0 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.list .it { display: flex; gap: 10px; align-items: center; padding: 8px 12px; border-top: 1px solid var(--line); }
+.list .it:first-child { border-top: 0; }
+.list .it .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.empty { padding: 14px; color: var(--muted); text-align: center; }
+.tree .it { cursor: default; }
+.tree .it .name button { border: 0; background: none; padding: 0; color: var(--ink); font-size: 15px; text-align: left; }
+.tree .it .name button:hover { color: var(--accent); }
+.tree .it.active { background: var(--chip); }
+.tree .meta { font-size: 13px; color: var(--muted); white-space: nowrap; }
+input[type=checkbox] { width: 17px; height: 17px; accent-color: var(--accent); margin: 0; flex: none; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 8px; margin-top: 10px; }
+.tile { position: relative; border-radius: 8px; overflow: hidden; background: var(--chip); aspect-ratio: 1; border: 2px solid transparent; }
+.tile.off { opacity: .4; }
+.tile img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.tile .ph { position: absolute; inset: 0; display: grid; place-items: center; font-size: 12px; color: var(--muted); padding: 6px; text-align: center; word-break: break-all; }
+.tile input { position: absolute; top: 6px; left: 6px; z-index: 1; }
+.tile .st { position: absolute; right: 5px; bottom: 5px; z-index: 1; }
+.target { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-top: 12px; }
+.kv { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.kv .k { font-size: 12px; color: var(--muted); }
+.kv .v { font-weight: 600; overflow-wrap: anywhere; }
+.log { margin-top: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; height: 210px;
+  overflow: auto; font: 12.5px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; }
+.log .warning { color: var(--warn); } .log .error, .log .critical { color: var(--bad); }
+.log .t { color: var(--muted); }
+.running { display: none; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; background: var(--chip); margin-top: 12px; }
+.running.on { display: flex; }
+.spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--muted); border-top-color: transparent; animation: s 1s linear infinite; }
+@keyframes s { to { transform: rotate(360deg); } }
+.verdict { padding: 14px 16px; border-radius: 12px; margin-top: 12px; font-weight: 600; }
+.verdict.yes { background: var(--ok-bg); color: var(--ok); }
+.verdict.no { background: var(--warn-bg); color: var(--warn); }
+.verdict small { display: block; font-weight: 400; color: var(--ink); margin-top: 4px; }
+ul.checks { list-style: none; padding: 0; margin: 12px 0 0; }
+ul.checks li { padding: 5px 0 5px 28px; position: relative; }
+ul.checks li::before { content: "○"; position: absolute; left: 4px; color: var(--muted); }
+ul.checks li.ok::before { content: "✓"; color: var(--ok); font-weight: 700; }
+.note { font-size: 13px; color: var(--muted); }
+.banner { padding: 10px 14px; border-radius: 10px; margin-top: 12px; }
+.banner.bad { background: var(--bad-bg); color: var(--bad); }
+code { font-size: 13px; background: var(--chip); padding: 1px 5px; border-radius: 5px; overflow-wrap: anywhere; }
+@media (max-width: 600px) { h1 { font-size: 23px; } section.card { padding: 16px; } .tree .meta { display: none; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Min Sky <span>→</span> iCloud</h1>
+      <p class="sub">Flytter bildene dine trygt. Ingenting slettes, og alt kontrolleres.</p>
+    </div>
+    <div class="overall" aria-live="polite">
+      <div><span class="big" id="ovNum">–</span> <span class="muted" id="ovText"></span></div>
+      <div class="bar" id="ovBar" role="img" aria-label="Fremdrift"></div>
+      <div class="legend">
+        <span><b style="background:var(--s-done)"></b>I iCloud</span>
+        <span><b style="background:var(--s-verified)"></b>Kontrollert</span>
+        <span><b style="background:var(--s-imported)"></b>I Bilder</span>
+        <span><b style="background:var(--s-pending)"></b>Venter</span>
+        <span><b style="background:var(--s-problem)"></b>Trenger tilsyn</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="running" id="running"><div class="spin"></div><div style="flex:1"><b id="jobTitle"></b> <span class="muted" id="jobTime"></span></div>
+    <button class="danger" id="stopBtn">Stopp</button></div>
+  <div id="lastJob"></div>
+
+  <!-- 1 -->
+  <section class="card">
+    <div class="step-h"><div class="num" id="n1">1</div><h2>Hent bildene fra Min Sky</h2></div>
+    <p class="muted">Logg inn på Min Sky og last ned bildene (zip-filer). Legg dem i innboksen, så pakker programmet dem ut og kontrollerer hver fil.
+      Det gjør ingenting om noe lastes ned to ganger.</p>
+    <div class="row">
+      <a class="btn" href="https://min-sky.no" target="_blank" rel="noopener">Åpne min-sky.no ↗</a>
+      <button id="openInbox">Åpne innboks-mappen</button>
+      <button class="primary" data-job="hent">Les inn nedlastinger</button>
+    </div>
+    <p class="note" style="margin-top:8px">Innboks: <code id="inboxPath"></code></p>
+    <div class="list" id="inbox"></div>
+  </section>
+
+  <!-- 2 -->
+  <section class="card">
+    <div class="step-h"><div class="num" id="n2">2</div><h2>Velg hvilke bilder som skal flyttes</h2></div>
+    <p class="muted">Alt er valgt i utgangspunktet. Fjern haken på mapper eller enkeltbilder du ikke vil ha med. Klikk på en mappe for å se bildene.</p>
+    <div class="row">
+      <button id="selAll">Velg alle</button><button id="selNone">Velg ingen</button>
+      <span class="muted" id="selSummary"></span>
+    </div>
+    <div class="list tree" id="tree"><div class="empty">Ingen bilder lest inn ennå.</div></div>
+    <div id="folderView"></div>
+  </section>
+
+  <!-- 3 -->
+  <section class="card">
+    <div class="step-h"><div class="num" id="n3">3</div><h2>Flytt til iCloud</h2></div>
+    <p class="muted">Bildene legges inn i Bilder-appen på denne Mac-en, og Apple laster dem opp til iCloud i original kvalitet. Dette gjelder også HEIC, videoer og Live Photos.</p>
+    <div class="target">
+      <div class="kv"><div class="k">iCloud-konto (fra denne Mac-en)</div><div class="v" id="appleId">–</div></div>
+      <div class="kv"><div class="k">Kobling til Bilder-appen</div><div class="v" id="osx">–</div></div>
+      <div class="kv"><div class="k">Album i Bilder</div><div class="v"><input type="text" id="album" value="Fra Min Sky" aria-label="Albumnavn"></div></div>
+    </div>
+    <p class="note">Sjekk at <b>iCloud-bilder</b> er slått på i Bilder → Innstillinger → iCloud, og at iCloud-abonnementet har plass til <b id="needSpace">–</b>.</p>
+    <div class="row">
+      <button data-job="prøverunde">Prøverunde (20 bilder)</button>
+      <button class="primary" data-job="flytt" id="moveBtn">Flytt valgte bilder</button>
+      <label class="note"><input type="checkbox" id="retry"> Prøv filer som feilet på nytt</label>
+    </div>
+    <div class="log" id="log" aria-live="polite"></div>
+  </section>
+
+  <!-- 4 -->
+  <section class="card">
+    <div class="step-h"><div class="num" id="n4">4</div><h2>Kontroll: er det trygt å si opp Min Sky?</h2></div>
+    <div id="verdict"></div>
+    <ul class="checks" id="checks"></ul>
+    <div class="row">
+      <label for="expected">Antall bilder og videoer Min Sky viser:</label>
+      <input type="number" id="expected" min="0" inputmode="numeric"><button id="saveExpected">Lagre</button>
+    </div>
+    <div class="row">
+      <button data-job="verifiser">Sjekk iCloud-opplasting</button>
+      <button data-job="kontroller-arkiv">Kontroller arkivet</button>
+      <button id="report">Lag rapport</button>
+      <button id="openArchive">Åpne arkivet</button>
+    </div>
+    <p class="note" style="margin-top:10px">Arkivet er din fullstendige sikkerhetskopi. Ta gjerne en kopi av det til en ekstern disk, og behold det.</p>
+  </section>
+  <p class="note">Arbeidsmappe: <code id="root"></code> · versjon <span id="ver"></span></p>
+</main>
+
+<script>
+const TOKEN = "__TOKEN__";
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let S = null, logSeq = 0, treeKey = "", openFolder = null, polling = null;
+
+async function api(path, body) {
+  const opt = body === undefined ? {} : { method: "POST", headers: {"Content-Type": "application/json", "X-Token": TOKEN}, body: JSON.stringify(body) };
+  const r = await fetch(path, opt);
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok && data.error) alert(data.error);
+  return data;
+}
+
+const STATE = {
+  i_icloud: ["I iCloud", "ok"], bekreftet: ["Kontrollert", "ok"], importert: ["I Bilder", ""], importerer: ["Importeres", ""],
+  arkivert: ["Venter", ""], feil: ["Feil", "bad"], avvik: ["Avvik", "bad"], i_papirkurv: ["Slettet i Bilder", "bad"], ikke_media: ["Annen fil", ""],
+};
+const SRC = { "ferdig": ["Lest inn", "ok"], "ødelagt": ["Ødelagt – last ned på nytt", "bad"], "pågår": ["Påbegynt", "warn"],
+  "ny": ["Ny – ikke lest inn", "warn"], "lastes ned": ["Lastes ned …", ""], "fil": ["Fil", "warn"] };
+const chip = ([t, c]) => `<span class="chip ${c}">${esc(t)}</span>`;
+
+async function poll() {
+  const s = await api(`/api/status?since=${logSeq}`);
+  if (!s || !s.counts) return;
+  S = s;
+  render(s);
+  const key = `${s.media_unique}|${s.counts.i_icloud}|${s.counts.arkivert}|${s.job ? s.job.name : ""}`;
+  if (key !== treeKey) { treeKey = key; loadTree(); if (openFolder !== null) loadFolder(openFolder); }
+  clearTimeout(polling);
+  polling = setTimeout(poll, s.job ? 1000 : 3000);
+}
+
+function render(s) {
+  const c = s.counts, sel = s.selected || 0;
+  const prob = c.feil + c.avvik + c.i_papirkurv;
+  $("ovNum").textContent = sel ? `${s.done} av ${sel}` : "0";
+  $("ovText").textContent = sel ? "valgte bilder er trygt i iCloud" : "bilder lest inn";
+  const pct = (n) => sel ? Math.min(100, 100 * n / sel) : 0;
+  $("ovBar").innerHTML = [[c.i_icloud, "--s-done"], [c.bekreftet, "--s-verified"], [c.importert + c.importerer, "--s-imported"], [prob, "--s-problem"]]
+    .map(([n, v]) => `<i style="width:${pct(n)}%;background:var(${v})"></i>`).join("");
+
+  $("inboxPath").textContent = s.inbox_path; $("root").textContent = s.root; $("ver").textContent = s.version;
+  $("inbox").innerHTML = s.inbox.length ? s.inbox.map(f =>
+    `<div class="it"><span>${f.dir ? "📁" : "🗜️"}</span><span class="name">${esc(f.name)}</span><span class="muted">${esc(f.size)}</span>${chip(SRC[f.status] || [f.status, ""])}</div>`).join("")
+    : `<div class="empty">Innboksen er tom. Last ned fra Min Sky og legg zip-filene her.</div>`;
+
+  $("selSummary").textContent = s.media_unique ? `${sel} av ${s.media_unique} valgt (${s.selected_bytes})` : "";
+  $("needSpace").textContent = s.selected_bytes;
+  $("moveBtn").textContent = sel ? `Flytt ${sel} valgte bilder` : "Flytt valgte bilder";
+  const m = s.mac;
+  $("appleId").textContent = m.is_mac ? (m.apple_id || "Ikke funnet – logg inn i Systeminnstillinger") : "Krever Mac";
+  $("osx").innerHTML = m.osxphotos ? `<span class="chip ok">Klar</span> <span class="note">${esc(m.osxphotos)}</span>`
+    : `<span class="chip bad">Mangler</span> <span class="note">kjør: pipx install osxphotos</span>`;
+
+  const busy = !!s.job;
+  document.querySelectorAll("[data-job]").forEach(b => b.disabled = busy);
+  ["selAll", "selNone"].forEach(id => $(id).disabled = busy && ["flytt", "prøverunde"].includes(s.job.name));
+  $("running").classList.toggle("on", busy);
+  if (busy) {
+    $("jobTitle").textContent = s.job.stopping ? "Stopper ved neste trygge punkt …" : s.job.title;
+    $("jobTime").textContent = fmtTime(s.job.elapsed); $("stopBtn").disabled = s.job.stopping;
+  }
+  const lj = s.last_job;
+  $("lastJob").innerHTML = !busy && lj && lj.result === "feil" ? `<div class="banner bad">«${esc(lj.title)}» stoppet med en feil. Se loggen i steg 3.</div>` : "";
+
+  if (s.log.length) {
+    const box = $("log"), atEnd = box.scrollTop + box.clientHeight >= box.scrollHeight - 20;
+    box.insertAdjacentHTML("beforeend", s.log.map(l => `<div class="${l.lvl}"><span class="t">${l.t}</span> ${esc(l.msg)}</div>`).join(""));
+    logSeq = s.log[s.log.length - 1].n;
+    while (box.children.length > 400) box.firstChild.remove();
+    if (atEnd) box.scrollTop = box.scrollHeight;
+  }
+  if (!$("log").children.length) $("log").innerHTML = `<div class="t">Loggen vises her når noe skjer.</div>`;
+
+  $("checks").innerHTML = s.checklist.map(x => `<li class="${x.ok ? "ok" : ""}">${esc(x.text)}</li>`).join("");
+  $("verdict").innerHTML = s.safe
+    ? `<div class="verdict yes">JA, alt er flyttet og kontrollert.<small>Behold arkivet, gjerne med en kopi på ekstern disk. Vent gjerne et par uker og sjekk at bildene vises på iPhone før du sier opp.</small></div>`
+    : `<div class="verdict no">NEI, ikke slett noe i Min Sky ennå.<small>${esc(s.next)}</small></div>`;
+  if (document.activeElement !== $("expected") && s.expected != null) $("expected").value = s.expected;
+
+  const srcOk = s.sources.length && s.sources.every(x => x.status === "ferdig");
+  $("n1").classList.toggle("done", !!srcOk && s.media_unique > 0);
+  $("n2").classList.toggle("done", s.media_unique > 0);
+  $("n3").classList.toggle("done", sel > 0 && s.done === sel);
+  $("n4").classList.toggle("done", s.safe);
+}
+const fmtTime = (sec) => sec < 60 ? `${sec} s` : sec < 3600 ? `${Math.floor(sec/60)} min ${sec%60} s` : `${Math.floor(sec/3600)} t ${Math.floor(sec%3600/60)} min`;
+
+async function loadTree() {
+  const t = await api("/api/tree");
+  if (!Array.isArray(t)) return;
+  $("tree").innerHTML = t.length ? t.map(n => {
+    const state = n.selected === 0 ? "" : n.selected === n.total ? "checked" : "data-mixed";
+    return `<div class="it ${openFolder === n.path ? "active" : ""}" style="padding-left:${12 + n.depth * 22}px">
+      <input type="checkbox" ${state === "checked" ? "checked" : ""} ${state} data-path="${esc(n.path)}" aria-label="Velg ${esc(n.label)}">
+      <span class="name"><button data-open="${esc(n.path)}" ${n.direct ? "" : "disabled"}>${n.depth ? "📁 " : "🗂️ "}${esc(n.label)}</button></span>
+      <span class="meta">${n.selected} av ${n.total} valgt · ${esc(n.size)}${n.done ? ` · ${n.done} i iCloud` : ""}</span></div>`;
+  }).join("") : `<div class="empty">Ingen bilder lest inn ennå. Gjør steg 1 først.</div>`;
+  $("tree").querySelectorAll("input[data-mixed]").forEach(i => i.indeterminate = true);
+}
+
+async function loadFolder(path) {
+  openFolder = path;
+  const f = await api(`/api/folder?path=${encodeURIComponent(path)}`);
+  if (!f.items) return;
+  $("folderView").innerHTML = `<div class="row" style="justify-content:space-between"><b>${esc(path.split("/").slice(1).join(" / ") || "Øverste nivå")}</b>
+    <span class="note">${f.total} filer${f.total > f.items.length ? ` (viser ${f.items.length})` : ""} · <button id="closeFolder">Lukk</button></span></div>
+    <div class="grid">${f.items.map(it => `<label class="tile ${it.selected ? "" : "off"}" title="${esc(it.name)} · ${esc(it.size)}${it.date ? " · " + esc(it.date) : ""}">
+      <div class="ph">${it.video ? "🎬<br>" : ""}${esc(it.name)}</div>
+      ${it.preview ? `<img loading="lazy" alt="" src="/api/file?id=${it.id}" onerror="this.remove()">` : ""}
+      <input type="checkbox" data-id="${it.id}" ${it.selected ? "checked" : ""} aria-label="Velg ${esc(it.name)}">
+      <span class="st">${chip(STATE[it.state] || [it.state, ""])}</span></label>`).join("")}</div>`;
+  $("closeFolder").onclick = () => { openFolder = null; $("folderView").innerHTML = ""; loadTree(); };
+  loadTree();
+}
+
+document.addEventListener("click", async (e) => {
+  const j = e.target.closest("[data-job]");
+  if (j && !j.disabled) {
+    const name = j.dataset.job;
+    if (name === "flytt" && S && !confirm(`Flytte ${S.selected} bilder (${S.selected_bytes}) til iCloud via Bilder-appen?\n\nDu kan stoppe når som helst og fortsette senere.`)) return;
+    await api("/api/job", { name, album: $("album").value.trim(), retry: $("retry").checked });
+    poll();
+  }
+  const o = e.target.closest("[data-open]");
+  if (o) loadFolder(o.dataset.open);
+});
+document.addEventListener("change", async (e) => {
+  const t = e.target;
+  if (t.dataset.path !== undefined) { await api("/api/select", { path: t.dataset.path, selected: t.checked }); }
+  else if (t.dataset.id) { await api("/api/select", { id: t.dataset.id, selected: t.checked }); t.closest(".tile").classList.toggle("off", !t.checked); }
+  else return;
+  treeKey = ""; poll();
+});
+$("stopBtn").onclick = () => api("/api/stop", {}).then(poll);
+$("openInbox").onclick = () => api("/api/open", { what: "innboks" });
+$("openArchive").onclick = () => api("/api/open", { what: "arkiv" });
+$("selAll").onclick = () => api("/api/select", { all: true, selected: true }).then(() => { treeKey = ""; poll(); });
+$("selNone").onclick = () => api("/api/select", { all: true, selected: false }).then(() => { treeKey = ""; poll(); });
+$("saveExpected").onclick = () => api("/api/expected", { antall: Number($("expected").value) }).then(poll);
+$("report").onclick = async () => { const r = await api("/api/report", {}); if (r.html) alert(`Rapport lagret:\n${r.html}\n${r.csv}`); };
+poll();
+</script>
+</body>
+</html>

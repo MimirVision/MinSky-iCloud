@@ -13,7 +13,7 @@ from . import __version__
 from . import photos as P
 from .ingest import ingest
 from .report import check_archive, print_status, write_reports
-from .util import IntegrityError, NotEnoughSpace, free_bytes, human
+from .util import IntegrityError, NotEnoughSpace, Stopped, free_bytes, human
 from .workspace import Workspace
 
 log = logging.getLogger("minsky")
@@ -46,6 +46,9 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     sub = ap.add_subparsers(dest="cmd", metavar="kommando")
 
+    appp = sub.add_parser("app", help="åpne programmet i nettleseren (anbefalt)")
+    appp.add_argument("--port", type=int, default=8765)
+    appp.add_argument("--ikke-åpne", dest="no_browser", action="store_true", help="ikke åpne nettleseren")
     sub.add_parser("sjekk", help="sjekk at alt er klart (Mac, osxphotos, diskplass)")
     sub.add_parser("hent", help="les inn det som er lastet ned til innboksen og arkiver det trygt")
 
@@ -81,8 +84,8 @@ def main(argv: list[str] | None = None) -> int:
     ap = build_parser()
     args = ap.parse_args(argv)
     if not args.cmd:
-        ap.print_help()
-        return 0
+        argv.append("app")  # double-click / no arguments: open the app
+        args = ap.parse_args(argv)
 
     ws = Workspace(args.mappe)
     _setup_logging(ws, args.detaljert)
@@ -90,7 +93,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         with ws:
             return _dispatch(ws, args)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, Stopped):
         log.warning("\nAvbrutt. Ingenting er tapt – kjør samme kommando igjen for å fortsette der du slapp.")
         return 130
     except (NotEnoughSpace, P.OsxphotosMissing) as e:
@@ -103,6 +106,10 @@ def main(argv: list[str] | None = None) -> int:
 
 def _dispatch(ws: Workspace, args) -> int:
     cmd = args.cmd
+    if cmd == "app":
+        from .server import serve
+
+        return serve(ws, port=args.port, open_browser=not args.no_browser, osxphotos_path=args.osxphotos)
     if cmd == "sjekk":
         return doctor(ws, args)
     if cmd == "hent":

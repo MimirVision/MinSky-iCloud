@@ -36,6 +36,9 @@ def gather(ws: Workspace) -> dict:
     ).fetchone()[0]
     sources = db.execute("SELECT * FROM sources ORDER BY id").fetchall()
     expected = ws.ledger.get_meta("forventet_antall")
+    deselected = db.execute(
+        "SELECT COUNT(*) FROM items WHERE is_media=1 AND selected=0 AND state=?", (L.ARKIVERT,)
+    ).fetchone()[0]
     return {
         "counts": c,
         "media_unique": media_total[0],
@@ -43,6 +46,7 @@ def gather(ws: Workspace) -> dict:
         "media_seen": occ_media,
         "sources": sources,
         "expected": int(expected) if expected else None,
+        "deselected": deselected,
         "already_in_photos": db.execute(
             "SELECT COUNT(*) FROM items WHERE role='fantes_allerede'"
         ).fetchone()[0],
@@ -54,7 +58,7 @@ def gather(ws: Workspace) -> dict:
 def checklist(g: dict) -> list[tuple[bool, str]]:
     c = g["counts"]
     broken = [s for s in g["sources"] if s["status"] != "ferdig"]
-    pending = c[L.ARKIVERT] + c[L.IMPORTERER] + c[L.IMPORTERT] + c[L.BEKREFTET]
+    pending = c[L.ARKIVERT] - g["deselected"] + c[L.IMPORTERER] + c[L.IMPORTERT] + c[L.BEKREFTET]
     problems = c[L.FEIL] + c[L.AVVIK] + c[L.I_PAPIRKURV]
     items = [
         (g["media_unique"] > 0, f"Bilder/videoer funnet i nedlastingene: {g['media_unique']}"),
@@ -68,7 +72,9 @@ def checklist(g: dict) -> list[tuple[bool, str]]:
         items.append((ok, f"Antall stemmer med Min Sky: forventet {g['expected']}, "
                           f"funnet {g['media_unique']} unike ({g['media_seen']} inkl. duplikater)"))
     items += [
-        (pending == 0, f"Alle er importert og kontrollert ({pending} gjenstår)"),
+        (pending == 0, f"Alle valgte er importert og kontrollert ({pending} gjenstår)"),
+        (g["deselected"] == 0, "Ingen bilder er valgt bort" if not g["deselected"] else
+         f"{g['deselected']} {'bilde' if g['deselected'] == 1 else 'bilder'} er valgt bort og ligger bare i arkivet"),
         (problems == 0, f"Ingen feil, avvik eller slettede ({problems} trenger tilsyn)"),
         (c[L.I_ICLOUD] == g["media_unique"] and g["media_unique"] > 0,
          f"Alle er bekreftet lastet opp til iCloud ({c[L.I_ICLOUD]} av {g['media_unique']})"),
@@ -122,7 +128,7 @@ def next_step(g: dict) -> str:
         return "Neste steg: last ned fra Min Sky til innboks-mappen og kjør «minsky-icloud kjør»."
     if any(s["status"] == "ødelagt" for s in g["sources"]):
         return "Neste steg: last ned de ødelagte zip-filene på nytt og kjør «minsky-icloud kjør»."
-    if c[L.ARKIVERT] or c[L.IMPORTERER] or c[L.IMPORTERT]:
+    if (c[L.ARKIVERT] - g["deselected"]) or c[L.IMPORTERER] or c[L.IMPORTERT]:
         return "Neste steg: kjør «minsky-icloud kjør»."
     if c[L.I_PAPIRKURV]:
         return ("Neste steg: åpne Bilder > Nylig slettet, gjenopprett bildene, og kjør "
@@ -211,6 +217,7 @@ def check_archive(ws: Workspace) -> bool:
     done = 0
     log.info("Kontrollerer %d filer i arkivet (%s) …", len(rows), human(total))
     for n, r in enumerate(rows, 1):
+        ws.check_stop()
         p = ws.archive_abs(r["archive_path"])
         if not p.exists():
             bad.append((r["archive_path"], "mangler"))

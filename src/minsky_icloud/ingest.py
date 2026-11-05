@@ -203,6 +203,7 @@ def _ingest_zip(ws: Workspace, path: Path, res: IngestResult) -> None:
 
         bad: list[str] = []
         for n, (info, name) in enumerate(todo, 1):
+            ws.check_stop()
             mtime = _zip_time(info)
             tmp = ws.tmp / f"{uuid.uuid4().hex}.part"
             try:
@@ -298,6 +299,7 @@ def _ingest_folder(ws: Workspace, group: Path, files: list[Path], res: IngestRes
     _check_space(ws, sum(st.st_size for _, _, st in todo))
     log.info("Leser inn %d filer fra %s", len(todo), "innboksen" if rel == "." else rel)
     for f, member, st in todo:
+        ws.check_stop()
         tmp = ws.tmp / f"{uuid.uuid4().hex}.part"
         with open(f, "rb") as fh:
             sha, size = write_stream_durably(fh, tmp)

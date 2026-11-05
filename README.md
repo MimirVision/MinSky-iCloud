@@ -35,6 +35,33 @@ Til slutt får du en sjekkliste som svarer **JA** eller **NEI** på om det er tr
 
 ---
 
+## Programmet (anbefalt)
+
+```bash
+minsky-icloud app
+```
+
+Programmet åpnes i nettleseren (det kjører bare på din egen maskin, `127.0.0.1`) og tar deg gjennom fire steg:
+
+1. **Hent fra Min Sky**: lenke til min-sky.no, knapp som åpner innboks-mappen, og en liste over nedlastingene
+   som viser om hver zip-fil er lest inn, ødelagt eller fortsatt lastes ned.
+2. **Velg bilder**: mappene fra Min Sky med avkrysningsbokser og miniatyrbilder. Alt er valgt i utgangspunktet,
+   og du fjerner det du ikke vil ha med.
+3. **Flytt til iCloud**: viser hvilken iCloud-konto Mac-en er logget inn med. Knapper for prøverunde og
+   «Flytt valgte bilder», fremdrift og logg. **Stopp** stopper ved neste trygge punkt. Trykk igjen for å fortsette.
+4. **Kontroll**: sjekklisten som svarer JA eller NEI på om det er trygt å si opp Min Sky.
+
+![Skjermbilde](docs/app.png)
+
+Kommandolinjen under gjør nøyaktig det samme, med de samme sikkerhetene.
+
+## Hvorfor HEIC går via Bilder-appen
+
+iCloud sin nettside (iCloud.com) og alle «direkte» iCloud-integrasjoner bruker Apples web-opplasting, og den tar
+**bare imot JPEG**. HEIC-bilder (iPhone-standarden), videoer og Live Photos blir avvist. Bilder-appen på Mac tar imot
+alt dette i original kvalitet, og laster det opp til iCloud selv. Derfor går programmet via Bilder-appen. Å konvertere
+HEIC til JPEG for å komme rundt det ville gitt dårligere kvalitet og ødelagt Live Photos.
+
 ## Dette trenger du
 
 * En **Mac** med macOS 12 eller nyere. Bilder-appen må være logget inn med Apple-ID-en som skal ha bildene.
@@ -240,12 +267,13 @@ Når `status` sier **JA** og du har tatt en kopi av `arkiv/`, kan du slette `inn
   som ligger i zip-filen. Den kan rettes i Bilder → Bilde → Juster dato og tid.
 * **Logg**: `~/MinSky-flytting/logg/minsky-icloud.log`
 
-## Hvorfor ikke direkte fra Min Sky til iCloud?
+## Hvorfor ikke innlogging med Telenor direkte i programmet?
 
-Verken Min Sky eller iCloud-bilder har noen offentlig API som støtter dette. Apple tilbyr bare opplasting via
-Bilder-appen, iCloud.com eller enhetene sine. Den tryggeste veien er derfor:
-offisiell nedlasting fra Min Sky → kontrollert lokal kopi → Apples egen Bilder-app → iCloud.
-Mellomsteget gir deg i tillegg en fullstendig sikkerhetskopi.
+Min Sky (nå drevet av Jottacloud) har ingen offentlig API. En innlogging rett i programmet krever at
+nettsidens interne API kartlegges, og det er planlagt som neste steg (se `docs/telenor-innlogging.md`).
+Uansett må bildene innom maskinen din: verken Telenor eller Apple kan sende bilder direkte seg imellom.
+Det som tar tid, er nedlasting og opplasting over nettet. Den lokale kopien koster litt diskplass, men nesten
+ingen tid, og den er sikkerhetsnettet ditt hvis noe går galt.
 
 ## For utviklere
 

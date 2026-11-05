@@ -19,5 +19,8 @@ version = {attr = "minsky_icloud.__version__"}
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+minsky_icloud = ["ui/*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

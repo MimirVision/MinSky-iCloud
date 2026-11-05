@@ -75,7 +75,7 @@ def import_to_photos(ws: Workspace, *, osxphotos: list[str], batch_size: int = 1
             log.info("Prøver %d filer som feilet tidligere på nytt.", n)
 
     rows = db.execute(
-        "SELECT * FROM items WHERE state IN (?, ?) ORDER BY force_import, archive_path",
+        "SELECT * FROM items WHERE state IN (?, ?) AND selected=1 ORDER BY force_import, archive_path",
         (L.IMPORTERER, L.ARKIVERT),
     ).fetchall()
     if limit is not None:
@@ -91,6 +91,7 @@ def import_to_photos(ws: Workspace, *, osxphotos: list[str], batch_size: int = 1
     for force in (0, 1):
         subset = [r for r in rows if r["force_import"] == force]
         for batch in _batches(subset, batch_size):
+            ws.check_stop()
             need = sum(r["size"] for r in batch)
             free = free_bytes(Path.home())
             if need + IMPORT_SPACE_MARGIN > free:

@@ -41,6 +41,10 @@ class NotEnoughSpace(Exception):
     pass
 
 
+class Stopped(Exception):
+    """The user pressed Stop. Raised only between safe points."""
+
+
 def now_iso() -> str:
     return _dt.datetime.now().astimezone().isoformat(timespec="seconds")
 
