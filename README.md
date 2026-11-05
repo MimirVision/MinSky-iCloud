@@ -35,187 +35,90 @@ Til slutt får du en sjekkliste som svarer **JA** eller **NEI** på om det er tr
 
 ---
 
-## Programmet (anbefalt)
+## Kom i gang (Mac)
 
-```bash
-minsky-icloud app
-```
+1. Last ned dette prosjektet som zip fra GitHub (grønn «Code»-knapp → «Download ZIP») og pakk det ut.
+2. Dobbeltklikk **`scripts/Installer.command`**. Svarer macOS at filen ikke kan åpnes, høyreklikker du den og velger
+   **Åpne**. Installasjonen tar seg av alt (Homebrew, osxphotos og programmet) og legger en snarvei
+   **«Min Sky til iCloud»** på skrivebordet.
+3. Systeminnstillinger → Personvern og sikkerhet → **Full disktilgang** → slå på **Terminal**.
+4. I Bilder-appen: Innstillinger → iCloud → slå på **iCloud-bilder**. Sjekk at iCloud-abonnementet har plass nok.
 
-Programmet åpnes i nettleseren (det kjører bare på din egen maskin, `127.0.0.1`) og tar deg gjennom fire steg:
-
-1. **Hent fra Min Sky**: lenke til min-sky.no, knapp som åpner innboks-mappen, og en liste over nedlastingene
-   som viser om hver zip-fil er lest inn, ødelagt eller fortsatt lastes ned.
-2. **Velg bilder**: mappene fra Min Sky med avkrysningsbokser og miniatyrbilder. Alt er valgt i utgangspunktet,
-   og du fjerner det du ikke vil ha med.
-3. **Flytt til iCloud**: viser hvilken iCloud-konto Mac-en er logget inn med. Knapper for prøverunde og
-   «Flytt valgte bilder», fremdrift og logg. **Stopp** stopper ved neste trygge punkt. Trykk igjen for å fortsette.
-4. **Kontroll**: sjekklisten som svarer JA eller NEI på om det er trygt å si opp Min Sky.
+Senere starter du programmet ved å dobbeltklikke snarveien. Det åpnes i nettleseren og kjører bare på din egen maskin.
 
 ![Skjermbilde](docs/app.png)
 
-Kommandolinjen under gjør nøyaktig det samme, med de samme sikkerhetene.
+## Slik bruker du det
+
+1. **Innstillinger**: Har du mange bilder, velger du en ekstern disk til arkivet først (se «Diskplass» under).
+2. **Last ned**: Slå på «Hent Min Sky-nedlastinger automatisk». Åpne min-sky.no i Chrome og last ned ett album
+   eller én bunke om gangen. Zip-filene hentes selv fra Nedlastinger-mappen og kontrolleres.
+3. **Prøverunde med 20 bilder**: Se etter albumet «Fra Min Sky» i Bilder og sjekk at alt ser riktig ut.
+4. **Start**: Autopiloten legger bildene inn i Bilder, kontrollerer dem og sjekker iCloud-opplastingen. Den fortsetter
+   så lenge du lar den gå. **Du kan fortsette å laste ned fra Min Sky mens den jobber**, og nye zip-filer blir
+   tatt med automatisk. Mac-en holdes våken, og du får et varsel når alt er ferdig eller noe trenger tilsyn.
+5. **Velg bilder** (valgfritt): Fjern haken på mapper eller enkeltbilder du ikke vil ha med.
+6. **Kontroll**: Skriv inn hvor mange bilder Min Sky sier du har. Når sjekklisten sier **JA**, er alt trygt i iCloud.
+
+«Sett på pause» stopper ved neste trygge punkt, og «Fortsett» tar opp tråden. Lukker du vinduet eller går strømmen,
+fortsetter du bare ved å starte igjen. Ingenting går tapt, og ingenting blir lagt inn to ganger.
+
+## Hvor lang tid tar det? (eksempel: 20 000 bilder)
+
+Tallene er grove anslag. Det meste avhenger av nettet ditt og Mac-en.
+
+| Del | Omtrent | Hva du gjør |
+|---|---|---|
+| Laste ned fra Min Sky (ca. 60–100 GB) | 2–4 timer på 100 Mbit/s | Klikk «Last ned» per album. Resten går av seg selv |
+| Lese inn og kontrollere | går **mens** du laster ned | ingenting |
+| Legge inn i Bilder | noen timer | ingenting, la Mac-en stå |
+| Bilder laster opp til iCloud | flere timer (avhenger av opplastingshastigheten din) | la Mac-en stå på over natten |
+| Kontroll | noen minutter | trykk «Kontroller arkivet» til slutt |
+
+Det som sparer tid i programmet:
+* **Alt overlapper.** Programmet leser inn og importerer mens du laster ned neste album, i stedet for at du venter
+  på hvert steg.
+* **Bilder legges inn 500 om gangen.** Bilder-appens database klargjøres én gang per runde, ikke for hvert lille parti.
+* **Mac-en holdes våken**, så en natt med opplasting ikke stopper fordi maskinen sovnet.
+* **Du slipper manuell kontroll** av 20 000 bilder. Sjekklisten gjør det for deg.
+* **Duplikater** (samme bilde i flere album) blir lest inn og lagt inn i Bilder bare én gang.
+
+## Diskplass
+
+Med 20 000 bilder trenger du plass til zip-filene, arkivet og Bilder-biblioteket, altså opptil 3 × størrelsen på bildene.
+* Legg **arkivet på en ekstern disk** (Innstillinger → «Hvor skal arkivet ligge?»).
+* Trykk **«Frigjør … : slett ferdige zip-filer»** under Last ned. Det slettes bare zip-filer der hver eneste fil er
+  kontrollert og ligger i arkivet. Originalene ligger fortsatt i Min Sky.
+* Slå på **«Optimaliser Mac-lagring»** i Bilder → Innstillinger → iCloud. Da sletter Bilder de lokale originalene
+  etter at de er lastet opp til iCloud.
+
+Programmet varsler deg i god tid hvis plassen blir for liten, og stopper før disken blir full.
 
 ## Hvorfor HEIC går via Bilder-appen
 
 iCloud sin nettside (iCloud.com) og alle «direkte» iCloud-integrasjoner bruker Apples web-opplasting, og den tar
 **bare imot JPEG**. HEIC-bilder (iPhone-standarden), videoer og Live Photos blir avvist. Bilder-appen på Mac tar imot
-alt dette i original kvalitet, og laster det opp til iCloud selv. Derfor går programmet via Bilder-appen. Å konvertere
-HEIC til JPEG for å komme rundt det ville gitt dårligere kvalitet og ødelagt Live Photos.
+alt dette i original kvalitet, og laster det opp til iCloud selv. Derfor går programmet via Bilder-appen.
 
-## Dette trenger du
+## Bruke Terminal i stedet
 
-* En **Mac** med macOS 12 eller nyere. Bilder-appen må være logget inn med Apple-ID-en som skal ha bildene.
-* **iCloud-bilder slått på**: Bilder → Innstillinger → iCloud → «iCloud-bilder».
-* **Nok iCloud-lagring** (iCloud+ 200 GB / 2 TB …). Verktøyet viser hvor mye bildene tar.
-  Sjekk i Systeminnstillinger → [ditt navn] → iCloud.
-* **Ledig diskplass**: omtrent 2 × størrelsen på bildene (arkiv + Bilder-bibliotek). Har du lite plass:
-  * legg arbeidsmappen på en **ekstern disk** (se under), og
-  * slå på «Optimaliser Mac-lagring» i Bilder → Innstillinger → iCloud.
-
-## Steg 1: Installer (én gang)
-
-Åpne **Terminal** (⌘+mellomrom, skriv «Terminal») og lim inn én linje om gangen:
-
-```bash
-xcode-select --install
-```
-
-```bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-```
-
-```bash
-brew install pipx && pipx ensurepath
-```
-
-Lukk Terminal og åpne den igjen. Installer deretter verktøyene:
-
-```bash
-pipx install osxphotos
-```
-
-```bash
-pipx install git+https://github.com/MimirVision/MinSky-iCloud.git
-```
-
-(Er repoet privat, kan du laste det ned som zip fra GitHub, pakke det ut og kjøre
-`pipx install ~/Downloads/MinSky-iCloud-main` i stedet.)
-
-**Tillatelser:** Systeminnstillinger → Personvern og sikkerhet → **Full disktilgang** → slå på **Terminal**.
-Første gang verktøyet snakker med Bilder, spør macOS om tilgang til Bilder. Svar **Tillat**.
-
-Sjekk at alt er klart:
-
-```bash
-minsky-icloud sjekk
-```
-
-### Vil du bruke en ekstern disk?
-
-Standardmappen er `~/MinSky-flytting`. Vil du heller bruke en ekstern disk, skriv dette i Terminal
-(bytt ut `MinDisk` med navnet på disken). Da slipper du å gi `--mappe` hver gang:
-
-```bash
-echo 'export MINSKY_MAPPE="/Volumes/MinDisk/MinSky-flytting"' >> ~/.zshrc && source ~/.zshrc
-```
-
-## Steg 2: Last ned fra Min Sky
-
-1. Gå til **min-sky.no** i nettleseren (Chrome eller Firefox anbefales) og logg inn.
-2. Last ned **alle bildene og videoene**. Ifølge Telenor finnes det en funksjon for å laste ned alt fra
-   Min Sky Web. Er det en grense for hvor mange du kan laste ned om gangen, tar du det i bolker, for eksempel ett år
-   eller ett album av gangen. **Det gjør ingenting om noe lastes ned flere ganger.**
-3. Lagre (eller flytt) zip-filene til mappen **`~/MinSky-flytting/innboks`**. Ikke pakk dem ut. Verktøyet gjør det
-   selv og kontrollerer dem underveis.
-   * Bruker du Safari: slå av Safari → Innstillinger → Generelt → «Åpne trygge filer etter nedlasting».
-     Ellers pakker Safari ut zip-filene og sletter dem. Utpakkede mapper fungerer også, men da har vi ikke
-     zip-filens sjekksummer å kontrollere mot.
-4. Noter hvor mange bilder og videoer **Min Sky sier** at du har, og registrer tallet:
-
-```bash
-minsky-icloud forventet 12345
-```
-
-> **Tips:** Er det mange bilder, kan du også be Telenor/Jotta om en full kopi av dataene dine
-> (retten til dataportabilitet etter GDPR). Den kan legges rett i innboksen.
-
-Filer som fortsatt lastes ned (`.crdownload`, `.part` eller nylig endrede filer) hoppes over til neste kjøring.
-
-## Steg 3: Prøverunde
-
-```bash
-minsky-icloud hent
-```
-
-Dette leser inn og kontrollerer alt i innboksen og legger det i `arkiv/`. Det går ingenting til iCloud ennå.
-
-```bash
-minsky-icloud kjør --antall 20
-```
-
-Dette importerer 20 bilder. Åpne Bilder og se etter albumet **«Fra Min Sky»**. Sjekk at bildene, datoene og videoene ser riktige ut.
-
-## Steg 4: Flytt alt
+Alt programmet gjør, kan også gjøres fra Terminal, med de samme sikkerhetene:
 
 ```bash
 minsky-icloud kjør
-```
-
-Dette kan ta timer for store samlinger. **Du kan avbryte når som helst** (Ctrl+C, lukke lokket, strømbrudd).
-Kjør samme kommando igjen for å fortsette. Har du lastet ned flere zip-filer, legger du dem i innboksen og kjører
-`kjør` på nytt.
-
-## Steg 5: Vent på iCloud og kontroller
-
-La Mac-en stå på (koblet til strøm) med **Bilder åpen** til opplastingen er ferdig. Nederst i Bilder → Bibliotek
-ser du hvordan det går. Kjør dette innimellom:
-
-```bash
-minsky-icloud verifiser
-```
-
-## Steg 6: Er det trygt å si opp Min Sky?
-
-```bash
-minsky-icloud kontroller-arkiv
 ```
 
 ```bash
 minsky-icloud status
 ```
 
-Du får en sjekkliste:
-
-```
-Er det trygt å si opp / slette Min Sky?
-  [✓] Bilder/videoer funnet i nedlastingene: 12345
-  [✓] Alle nedlastede zip-filer er lest inn uten feil
-  [✓] Antall stemmer med Min Sky: forventet 12345, funnet 12345 unike
-  [✓] Alle er importert og kontrollert (0 gjenstår)
-  [✓] Ingen feil, avvik eller slettede (0 trenger tilsyn)
-  [✓] Alle er bekreftet lastet opp til iCloud (12345 av 12345)
-  [✓] Arkivet er kontrollert
-
-JA – alt er kontrollert.
-```
-
-Står det **NEI**, forteller verktøyet hva neste steg er. Vil du se en rapport over alle filer, kjører du denne:
-
-```bash
-minsky-icloud rapport
-```
-
-Det åpner en HTML-rapport og lager en CSV-fil du kan åpne i Numbers eller Excel.
-
-**Anbefaling:** Ta en kopi av `arkiv`-mappen til en ekstern disk og behold den. Vent gjerne noen uker
-med å si opp Min Sky, og sjekk i mellomtiden at bildene dukker opp på iPhone og iCloud.com.
-
----
 
 ## Alle kommandoer
 
 | Kommando | Hva den gjør |
 |---|---|
+| `minsky-icloud app` | Åpner programmet (det samme som snarveien) |
+| `minsky-icloud snarvei` | Lager snarvei på skrivebordet |
 | `minsky-icloud sjekk` | Sjekker Mac, osxphotos og diskplass |
 | `minsky-icloud hent` | Leser inn og kontrollerer nedlastinger og arkiverer dem (fungerer også på Windows/Linux) |
 | `minsky-icloud importer [--antall N]` | Legger arkiverte bilder inn i Bilder-appen |

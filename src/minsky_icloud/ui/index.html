@@ -3,335 +3,594 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
 <title>Min Sky → iCloud</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230a66d8'/%3E%3Cpath d='M9 21h14a4 4 0 0 0 0-8 6 6 0 0 0-11.5-1.5A4.5 4.5 0 0 0 9 21z' fill='white'/%3E%3C/svg%3E">
 <style>
 :root {
-  --bg: #f5f5f7; --card: #ffffff; --ink: #1d1d1f; --muted: #6e6e73; --line: #e3e3e8;
-  --accent: #0a66d8; --accent-ink: #ffffff; --ok: #1a7f37; --warn: #b35900; --bad: #c4291c;
-  --ok-bg: #e8f5ec; --warn-bg: #fff4e5; --bad-bg: #fdecea; --chip: #eef0f4;
-  --s-done: #1a7f37; --s-verified: #5aa469; --s-imported: #8fb8ea; --s-pending: #c9ced6; --s-problem: #c4291c;
-  --shadow: 0 1px 2px rgba(0,0,0,.05), 0 4px 16px rgba(0,0,0,.04);
+  --bg: #f4f5f8; --card: #ffffff; --card2: #f8f9fb; --ink: #16181d; --ink2: #3c4049; --muted: #6b7180; --line: #e4e6ec;
+  --accent: #0a66d8; --accent2: #0b57b8; --accent-soft: #e8f1fd; --on-accent: #ffffff;
+  --ok: #17803d; --ok-soft: #e7f5ec; --warn: #a65300; --warn-soft: #fff3e3; --bad: #c42a1c; --bad-soft: #fdecea;
+  --c-done: #1f9d55; --c-photos: #7fb0ea; --c-wait: #d5d9e1; --c-bad: #e5484d;
+  --shadow: 0 1px 2px rgba(16,24,40,.04), 0 6px 24px rgba(16,24,40,.06);
+  --r: 16px;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #111113; --card: #1c1c1f; --ink: #f2f2f4; --muted: #a1a1a8; --line: #2e2e33;
-    --accent: #4c94ff; --accent-ink: #0b0b0c; --ok: #4cc26b; --warn: #f0a33a; --bad: #ff6b5e;
-    --ok-bg: #16301e; --warn-bg: #33260f; --bad-bg: #3a1714; --chip: #2a2a2f;
-    --s-done: #4cc26b; --s-verified: #2f7d45; --s-imported: #35619a; --s-pending: #3a3a40; --s-problem: #ff6b5e;
+    --bg: #0e0f12; --card: #17191d; --card2: #1d2025; --ink: #f1f2f5; --ink2: #c9ccd3; --muted: #9aa0ac; --line: #2a2d34;
+    --accent: #4d95ff; --accent2: #6aa7ff; --accent-soft: #15243a; --on-accent: #08101d;
+    --ok: #4cc777; --ok-soft: #13291b; --warn: #f2a541; --warn-soft: #30230f; --bad: #ff6b60; --bad-soft: #3a1714;
+    --c-done: #3fbf6c; --c-photos: #3b6aa6; --c-wait: #33363e; --c-bad: #ff6b60;
     --shadow: none;
   }
 }
+:root[data-theme="dark"] {
+  --bg: #0e0f12; --card: #17191d; --card2: #1d2025; --ink: #f1f2f5; --ink2: #c9ccd3; --muted: #9aa0ac; --line: #2a2d34;
+  --accent: #4d95ff; --accent2: #6aa7ff; --accent-soft: #15243a; --on-accent: #08101d;
+  --ok: #4cc777; --ok-soft: #13291b; --warn: #f2a541; --warn-soft: #30230f; --bad: #ff6b60; --bad-soft: #3a1714;
+  --c-done: #3fbf6c; --c-photos: #3b6aa6; --c-wait: #33363e; --c-bad: #ff6b60; --shadow: none;
+}
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
 body { margin: 0; background: var(--bg); color: var(--ink);
-  font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
-main { max-width: 980px; margin: 0 auto; padding: 24px 16px 64px; }
-header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
-h1 { font-size: 28px; margin: 0; letter-spacing: -.01em; }
-h1 span { color: var(--muted); font-weight: 400; }
-.sub { color: var(--muted); margin: 2px 0 0; }
-.overall { min-width: 260px; flex: 1; max-width: 420px; }
-.overall .big { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.bar { display: flex; height: 10px; border-radius: 6px; overflow: hidden; background: var(--s-pending); margin-top: 6px; }
-.bar > i { display: block; height: 100%; transition: width .4s; }
-.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--muted); margin-top: 6px; }
-.legend b { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: 0; }
-section.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px; margin: 14px 0; box-shadow: var(--shadow); }
-.step-h { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
-.num { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
-  background: var(--chip); font-weight: 600; font-size: 14px; }
-.num.done { background: var(--ok); color: #fff; }
-h2 { font-size: 18px; margin: 0; }
-p { margin: 6px 0; }
-.muted { color: var(--muted); }
-.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
-button, .btn { font: inherit; font-size: 14px; border-radius: 9px; border: 1px solid var(--line);
-  background: var(--card); color: var(--ink); padding: 8px 14px; cursor: pointer; text-decoration: none; display: inline-block; }
+  font: 15px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif; }
+main { max-width: 1040px; margin: 0 auto; padding: 20px 16px 72px; }
+.num-tab { font-variant-numeric: tabular-nums; }
+
+/* top bar */
+.top { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+.logo { width: 38px; height: 38px; border-radius: 10px; background: var(--accent); display: grid; place-items: center; flex: none; }
+.top h1 { font-size: 20px; margin: 0; letter-spacing: -.01em; }
+.top .tag { color: var(--muted); font-size: 13px; }
+.pill { margin-left: auto; display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px; border-radius: 99px;
+  background: var(--card); border: 1px solid var(--line); font-size: 13px; font-weight: 600; white-space: nowrap; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.pill.run .dot { background: var(--accent); animation: pulse 1.4s ease-in-out infinite; }
+.pill.ok .dot { background: var(--ok); } .pill.bad .dot { background: var(--bad); }
+@keyframes pulse { 50% { opacity: .3; } }
+
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow); }
+
+/* hero */
+.hero { display: grid; grid-template-columns: 200px 1fr; gap: 28px; padding: 26px 28px; align-items: center; }
+.ring { position: relative; width: 200px; height: 200px; }
+.ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring circle { fill: none; stroke-width: 14; }
+.ring .track { stroke: var(--c-wait); }
+.ring .seg { transition: stroke-dasharray .6s ease, stroke-dashoffset .6s ease; stroke-linecap: butt; }
+.ring .label { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+.ring .pct { font-size: 40px; font-weight: 700; letter-spacing: -.02em; line-height: 1; }
+.ring .cap { font-size: 13px; color: var(--muted); margin-top: 4px; }
+.phase { display: flex; align-items: center; gap: 8px; color: var(--ink2); font-size: 14px; min-height: 22px; }
+.spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--accent); border-top-color: transparent;
+  animation: spin 0.9s linear infinite; flex: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.headline { font-size: 26px; font-weight: 700; letter-spacing: -.015em; margin: 6px 0 2px; line-height: 1.25; }
+.headline span { color: var(--muted); font-weight: 500; font-size: 18px; }
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 16px 0; }
+.stat { background: var(--card2); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.stat .v { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.stat .k { font-size: 12.5px; color: var(--muted); display: flex; align-items: center; gap: 6px; line-height: 1.3; }
+.stat .k i { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+.eta { font-size: 13.5px; color: var(--muted); margin-bottom: 14px; min-height: 20px; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+
+/* buttons */
+button, .btn { font: inherit; font-size: 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--card);
+  color: var(--ink); padding: 8px 14px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; line-height: 1.3; }
 button:hover:not(:disabled), .btn:hover { border-color: var(--muted); }
-button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
-button.danger { color: var(--bad); }
 button:disabled { opacity: .45; cursor: default; }
-button:focus-visible, .btn:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-input[type=number], input[type=text] { font: inherit; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line);
-  background: var(--bg); color: var(--ink); width: 150px; }
-.chip { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 99px; background: var(--chip); color: var(--muted); white-space: nowrap; }
-.chip.ok { background: var(--ok-bg); color: var(--ok); }
-.chip.warn { background: var(--warn-bg); color: var(--warn); }
-.chip.bad { background: var(--bad-bg); color: var(--bad); }
-.list { margin: 12px 0 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
-.list .it { display: flex; gap: 10px; align-items: center; padding: 8px 12px; border-top: 1px solid var(--line); }
-.list .it:first-child { border-top: 0; }
-.list .it .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.empty { padding: 14px; color: var(--muted); text-align: center; }
-.tree .it { cursor: default; }
-.tree .it .name button { border: 0; background: none; padding: 0; color: var(--ink); font-size: 15px; text-align: left; }
-.tree .it .name button:hover { color: var(--accent); }
-.tree .it.active { background: var(--chip); }
-.tree .meta { font-size: 13px; color: var(--muted); white-space: nowrap; }
-input[type=checkbox] { width: 17px; height: 17px; accent-color: var(--accent); margin: 0; flex: none; }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 8px; margin-top: 10px; }
-.tile { position: relative; border-radius: 8px; overflow: hidden; background: var(--chip); aspect-ratio: 1; border: 2px solid transparent; }
-.tile.off { opacity: .4; }
-.tile img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
-.tile .ph { position: absolute; inset: 0; display: grid; place-items: center; font-size: 12px; color: var(--muted); padding: 6px; text-align: center; word-break: break-all; }
-.tile input { position: absolute; top: 6px; left: 6px; z-index: 1; }
-.tile .st { position: absolute; right: 5px; bottom: 5px; z-index: 1; }
-.target { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-top: 12px; }
-.kv { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
-.kv .k { font-size: 12px; color: var(--muted); }
-.kv .v { font-weight: 600; overflow-wrap: anywhere; }
-.log { margin-top: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; height: 210px;
-  overflow: auto; font: 12.5px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; }
+button:focus-visible, .btn:focus-visible, input:focus-visible, .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.big { font-size: 16px; font-weight: 650; padding: 12px 22px; border-radius: 12px; }
+.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+.primary:hover:not(:disabled) { background: var(--accent2); border-color: var(--accent2); }
+.ghost { background: transparent; }
+.link { border: 0; background: none; padding: 0; color: var(--accent); font-weight: 500; }
+.danger { color: var(--bad); }
+
+/* alerts */
+#alerts { display: grid; gap: 8px; margin-top: 14px; }
+.alert { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; font-size: 14px; border: 1px solid transparent; }
+.alert .ico { flex: none; font-size: 16px; line-height: 1.3; }
+.alert .txt { flex: 1; }
+.alert.warn { background: var(--warn-soft); color: var(--ink); border-color: color-mix(in srgb, var(--warn) 25%, transparent); }
+.alert.bad { background: var(--bad-soft); color: var(--ink); border-color: color-mix(in srgb, var(--bad) 25%, transparent); }
+.alert.info { background: var(--accent-soft); color: var(--ink); border-color: color-mix(in srgb, var(--accent) 25%, transparent); }
+.alert.ok { background: var(--ok-soft); color: var(--ink); border-color: color-mix(in srgb, var(--ok) 25%, transparent); }
+.alert b { font-weight: 650; }
+.alert button { padding: 5px 11px; font-size: 13px; }
+
+/* tabs */
+.tabs { display: flex; gap: 4px; margin: 22px 0 12px; padding: 4px; background: var(--card); border: 1px solid var(--line);
+  border-radius: 12px; overflow-x: auto; scrollbar-width: none; }
+.tab { flex: 1; white-space: nowrap; border: 0; background: none; padding: 8px 12px; border-radius: 9px; font-weight: 550; color: var(--muted); justify-content: center; }
+.tab[aria-selected="true"] { background: var(--accent-soft); color: var(--accent); }
+.tab .badge { font-size: 11.5px; padding: 0 7px; border-radius: 99px; background: var(--line); color: var(--ink2); font-weight: 600; }
+.tab .badge.bad { background: var(--bad); color: #fff; } .tab .badge.ok { background: var(--ok); color: #fff; }
+.panel { display: none; padding: 22px; }
+.panel.on { display: block; }
+.panel h2 { font-size: 18px; margin: 0 0 4px; }
+.panel h3 { font-size: 15px; margin: 22px 0 8px; }
+.lead { color: var(--muted); margin: 0 0 14px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+/* how-to */
+.howto { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 14px 0 18px; }
+.howto div { background: var(--card2); border: 1px solid var(--line); border-radius: 12px; padding: 14px; font-size: 14px; }
+.howto b { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: var(--on-accent);
+  font-size: 13px; margin-bottom: 8px; }
+.switch { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; }
+.switch input { appearance: none; width: 40px; height: 24px; border-radius: 99px; background: var(--c-wait); position: relative; flex: none; cursor: pointer; transition: background .2s; margin: 0; }
+.switch input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform .2s; box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+.switch input:checked { background: var(--ok); }
+.switch input:checked::after { transform: translateX(16px); }
+.switch small { display: block; color: var(--muted); }
+
+/* lists */
+.list { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.it { display: flex; gap: 10px; align-items: center; padding: 9px 14px; border-top: 1px solid var(--line); min-height: 44px; }
+.it:first-child { border-top: 0; }
+.it .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.it .meta { font-size: 13px; color: var(--muted); white-space: nowrap; }
+.empty { padding: 22px; color: var(--muted); text-align: center; }
+.chip { display: inline-block; font-size: 12px; padding: 2px 9px; border-radius: 99px; background: var(--card2); border: 1px solid var(--line); color: var(--muted); white-space: nowrap; font-weight: 550; }
+.chip.ok { background: var(--ok-soft); color: var(--ok); border-color: transparent; }
+.chip.warn { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
+.chip.bad { background: var(--bad-soft); color: var(--bad); border-color: transparent; }
+.chip.info { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+.minibar { width: 90px; height: 6px; border-radius: 9px; background: var(--c-wait); overflow: hidden; flex: none; }
+.minibar i { display: block; height: 100%; background: var(--c-done); }
+
+/* selection */
+.tree .it.active { background: var(--accent-soft); }
+.tree .open { border: 0; background: none; padding: 0; color: var(--ink); font-size: 15px; text-align: left; max-width: 100%; overflow: hidden; text-overflow: ellipsis; display: block; }
+.tree .open:hover:not(:disabled) { color: var(--accent); }
+.tree .open:disabled { opacity: 1; font-weight: 600; }
+input[type=checkbox]:not(.toggle) { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; flex: none; cursor: pointer; }
+.viewer { margin-top: 16px; }
+.viewer-h { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; margin-top: 10px; }
+.tile { position: relative; border-radius: 10px; overflow: hidden; background: var(--card2); aspect-ratio: 1; cursor: pointer; border: 1px solid var(--line); }
+.tile.off img, .tile.off .ph { opacity: .3; filter: grayscale(1); }
+.tile img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.tile .ph { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; font-size: 11.5px; color: var(--muted); padding: 8px; word-break: break-all; gap: 4px; }
+.tile .ph .vid { font-size: 22px; }
+.tile input { position: absolute; top: 7px; left: 7px; z-index: 1; }
+.tile .st { position: absolute; right: 6px; bottom: 6px; z-index: 1; }
+.tile .st .chip { box-shadow: 0 1px 3px rgba(0,0,0,.2); background: var(--card); }
+
+/* control */
+.verdict { display: flex; gap: 14px; align-items: center; padding: 18px; border-radius: 14px; margin-bottom: 14px; }
+.verdict .big-ico { font-size: 30px; line-height: 1; }
+.verdict b { font-size: 18px; display: block; }
+.verdict.yes { background: var(--ok-soft); } .verdict.yes b { color: var(--ok); }
+.verdict.no { background: var(--warn-soft); } .verdict.no b { color: var(--warn); }
+ul.checks { list-style: none; padding: 0; margin: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+ul.checks li { padding: 10px 14px 10px 44px; position: relative; border-top: 1px solid var(--line); }
+ul.checks li:first-child { border-top: 0; }
+ul.checks li::before { content: ""; position: absolute; left: 14px; top: 12px; width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--c-wait); }
+ul.checks li.ok::before { content: "✓"; background: var(--ok); border-color: var(--ok); color: #fff; font-size: 12px; font-weight: 800; display: grid; place-items: center; }
+input[type=number], input[type=text] { font: inherit; padding: 8px 11px; border-radius: 10px; border: 1px solid var(--line); background: var(--card2); color: var(--ink); width: 160px; }
+
+/* settings */
+.vols { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
+.vol { text-align: left; display: block; padding: 12px 14px; border-radius: 12px; }
+.vol.cur { border-color: var(--accent); background: var(--accent-soft); }
+.vol b { display: block; } .vol small { color: var(--muted); }
+.kv { display: grid; grid-template-columns: 200px 1fr; gap: 8px 16px; font-size: 14px; }
+.kv dt { color: var(--muted); } .kv dd { margin: 0; overflow-wrap: anywhere; }
+code { font: 12.5px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--card2); border: 1px solid var(--line); padding: 1px 6px; border-radius: 6px; overflow-wrap: anywhere; }
+
+.log { background: var(--card2); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; height: 420px;
+  overflow: auto; font: 12.5px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; }
 .log .warning { color: var(--warn); } .log .error, .log .critical { color: var(--bad); }
 .log .t { color: var(--muted); }
-.running { display: none; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; background: var(--chip); margin-top: 12px; }
-.running.on { display: flex; }
-.spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--muted); border-top-color: transparent; animation: s 1s linear infinite; }
-@keyframes s { to { transform: rotate(360deg); } }
-.verdict { padding: 14px 16px; border-radius: 12px; margin-top: 12px; font-weight: 600; }
-.verdict.yes { background: var(--ok-bg); color: var(--ok); }
-.verdict.no { background: var(--warn-bg); color: var(--warn); }
-.verdict small { display: block; font-weight: 400; color: var(--ink); margin-top: 4px; }
-ul.checks { list-style: none; padding: 0; margin: 12px 0 0; }
-ul.checks li { padding: 5px 0 5px 28px; position: relative; }
-ul.checks li::before { content: "○"; position: absolute; left: 4px; color: var(--muted); }
-ul.checks li.ok::before { content: "✓"; color: var(--ok); font-weight: 700; }
-.note { font-size: 13px; color: var(--muted); }
-.banner { padding: 10px 14px; border-radius: 10px; margin-top: 12px; }
-.banner.bad { background: var(--bad-bg); color: var(--bad); }
-code { font-size: 13px; background: var(--chip); padding: 1px 5px; border-radius: 5px; overflow-wrap: anywhere; }
-@media (max-width: 600px) { h1 { font-size: 23px; } section.card { padding: 16px; } .tree .meta { display: none; } }
+.foot { color: var(--muted); font-size: 12.5px; margin-top: 18px; text-align: center; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+@media (max-width: 760px) {
+  .hero { grid-template-columns: 1fr; justify-items: center; text-align: center; padding: 22px 18px; gap: 14px; }
+  .ring { width: 170px; height: 170px; }
+  .phase, .actions { justify-content: center; }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); text-align: left; }
+  .howto { grid-template-columns: 1fr; }
+  .panel { padding: 16px; }
+  .headline { font-size: 22px; }
+  .tab { flex: none; }
+  .kv { grid-template-columns: 1fr; gap: 2px; } .kv dd { margin-bottom: 8px; }
+  .it .meta.hide-m { display: none; }
+  .top .tag { display: none; }
+}
 </style>
 </head>
 <body>
 <main>
-  <header>
-    <div>
-      <h1>Min Sky <span>→</span> iCloud</h1>
-      <p class="sub">Flytter bildene dine trygt. Ingenting slettes, og alt kontrolleres.</p>
+  <div class="top">
+    <div class="logo" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24"><path d="M6.5 18h11a3.5 3.5 0 0 0 .4-6.98A5.5 5.5 0 0 0 7.3 9.6 4.25 4.25 0 0 0 6.5 18z" fill="#fff"/></svg></div>
+    <div><h1>Min Sky → iCloud</h1><div class="tag">Flytter bildene dine trygt. Ingenting slettes, og alt blir kontrollert.</div></div>
+    <div class="pill" id="pill"><span class="dot"></span><span id="pillText">Kobler til …</span></div>
+  </div>
+
+  <section class="card hero" aria-label="Fremdrift">
+    <div class="ring">
+      <svg viewBox="0 0 120 120" aria-hidden="true">
+        <circle class="track" cx="60" cy="60" r="52"/>
+        <circle class="seg" id="segDone" cx="60" cy="60" r="52" stroke="var(--c-done)"/>
+        <circle class="seg" id="segPhotos" cx="60" cy="60" r="52" stroke="var(--c-photos)"/>
+        <circle class="seg" id="segBad" cx="60" cy="60" r="52" stroke="var(--c-bad)"/>
+      </svg>
+      <div class="label"><div class="pct num-tab" id="pct">0 %</div><div class="cap">i iCloud</div></div>
     </div>
-    <div class="overall" aria-live="polite">
-      <div><span class="big" id="ovNum">–</span> <span class="muted" id="ovText"></span></div>
-      <div class="bar" id="ovBar" role="img" aria-label="Fremdrift"></div>
-      <div class="legend">
-        <span><b style="background:var(--s-done)"></b>I iCloud</span>
-        <span><b style="background:var(--s-verified)"></b>Kontrollert</span>
-        <span><b style="background:var(--s-imported)"></b>I Bilder</span>
-        <span><b style="background:var(--s-pending)"></b>Venter</span>
-        <span><b style="background:var(--s-problem)"></b>Trenger tilsyn</span>
+    <div style="min-width:0;width:100%">
+      <div class="phase" id="phase" aria-live="polite"></div>
+      <div class="headline num-tab" id="headline">–</div>
+      <div class="stats">
+        <div class="stat"><div class="v num-tab" id="stDone">0</div><div class="k"><i style="background:var(--c-done)"></i>Trygt i iCloud</div></div>
+        <div class="stat"><div class="v num-tab" id="stPhotos">0</div><div class="k"><i style="background:var(--c-photos)"></i>I Bilder, lastes opp</div></div>
+        <div class="stat"><div class="v num-tab" id="stWait">0</div><div class="k"><i style="background:var(--c-wait)"></i>Venter på tur</div></div>
+        <div class="stat"><div class="v num-tab" id="stBad">0</div><div class="k"><i style="background:var(--c-bad)"></i>Trenger tilsyn</div></div>
+      </div>
+      <div class="eta num-tab" id="eta"></div>
+      <div class="actions">
+        <button class="primary big" id="mainBtn">▶ Start</button>
+        <button class="ghost" id="trialBtn" data-job="prøverunde">Prøverunde med 20 bilder</button>
       </div>
     </div>
-  </header>
+  </section>
 
-  <div class="running" id="running"><div class="spin"></div><div style="flex:1"><b id="jobTitle"></b> <span class="muted" id="jobTime"></span></div>
-    <button class="danger" id="stopBtn">Stopp</button></div>
-  <div id="lastJob"></div>
+  <div id="alerts" aria-live="polite"></div>
 
-  <!-- 1 -->
-  <section class="card">
-    <div class="step-h"><div class="num" id="n1">1</div><h2>Hent bildene fra Min Sky</h2></div>
-    <p class="muted">Logg inn på Min Sky og last ned bildene (zip-filer). Legg dem i innboksen, så pakker programmet dem ut og kontrollerer hver fil.
-      Det gjør ingenting om noe lastes ned to ganger.</p>
-    <div class="row">
-      <a class="btn" href="https://min-sky.no" target="_blank" rel="noopener">Åpne min-sky.no ↗</a>
-      <button id="openInbox">Åpne innboks-mappen</button>
-      <button class="primary" data-job="hent">Les inn nedlastinger</button>
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-tab="hent">Last ned <span class="badge" id="bHent" hidden></span></button>
+    <button class="tab" role="tab" data-tab="velg">Velg bilder <span class="badge" id="bVelg" hidden></span></button>
+    <button class="tab" role="tab" data-tab="kontroll">Kontroll <span class="badge" id="bKontroll" hidden></span></button>
+    <button class="tab" role="tab" data-tab="logg">Logg</button>
+    <button class="tab" role="tab" data-tab="innst">Innstillinger</button>
+  </div>
+
+  <!-- LAST NED -->
+  <section class="card panel" id="p-hent" role="tabpanel">
+    <h2>Last ned fra Min Sky</h2>
+    <p class="lead">Du laster ned bildene fra Min Sky i nettleseren, og resten går av seg selv. Du kan fortsette å laste ned mens programmet flytter.</p>
+    <div class="howto">
+      <div><b>1</b>Åpne <a href="https://min-sky.no" target="_blank" rel="noopener">min-sky.no</a> i Chrome og logg inn med Telenor-brukeren din.</div>
+      <div><b>2</b>Velg et album eller en bunke bilder og trykk <i>Last ned</i>. Ta én bunke om gangen.</div>
+      <div><b>3</b>Zip-filen hentes automatisk fra Nedlastinger og blir kontrollert. Det gjør ingenting om noe lastes ned to ganger.</div>
     </div>
-    <p class="note" style="margin-top:8px">Innboks: <code id="inboxPath"></code></p>
+    <label class="switch"><input type="checkbox" class="toggle" id="autoDl">
+      <span><b>Hent Min Sky-nedlastinger automatisk fra Nedlastinger-mappen</b>
+      <small>Bare zip-filer med bilder eller video, lastet ned etter at dette ble slått på. Andre filer røres ikke.</small></span></label>
+    <div id="dlCands"></div>
+    <h3>Nedlastinger</h3>
     <div class="list" id="inbox"></div>
+    <div class="row" style="margin-top:12px">
+      <a class="btn" href="https://min-sky.no" target="_blank" rel="noopener">Åpne min-sky.no ↗</a>
+      <button id="openInbox">Vis innboks-mappen</button>
+      <button data-job="hent">Les inn nå</button>
+      <button id="cleanBtn" hidden></button>
+    </div>
   </section>
 
-  <!-- 2 -->
-  <section class="card">
-    <div class="step-h"><div class="num" id="n2">2</div><h2>Velg hvilke bilder som skal flyttes</h2></div>
-    <p class="muted">Alt er valgt i utgangspunktet. Fjern haken på mapper eller enkeltbilder du ikke vil ha med. Klikk på en mappe for å se bildene.</p>
-    <div class="row">
+  <!-- VELG -->
+  <section class="card panel" id="p-velg" role="tabpanel">
+    <h2>Velg hvilke bilder som skal flyttes</h2>
+    <p class="lead">Alt er valgt i utgangspunktet. Fjern haken på mapper eller enkeltbilder du ikke vil ha med. Klikk på en mappe for å se bildene.</p>
+    <div class="row" style="margin-bottom:12px">
       <button id="selAll">Velg alle</button><button id="selNone">Velg ingen</button>
-      <span class="muted" id="selSummary"></span>
+      <span class="muted" id="selSummary" style="color:var(--muted)"></span>
     </div>
-    <div class="list tree" id="tree"><div class="empty">Ingen bilder lest inn ennå.</div></div>
-    <div id="folderView"></div>
+    <div class="list tree" id="tree"></div>
+    <div class="viewer" id="viewer"></div>
   </section>
 
-  <!-- 3 -->
-  <section class="card">
-    <div class="step-h"><div class="num" id="n3">3</div><h2>Flytt til iCloud</h2></div>
-    <p class="muted">Bildene legges inn i Bilder-appen på denne Mac-en, og Apple laster dem opp til iCloud i original kvalitet. Dette gjelder også HEIC, videoer og Live Photos.</p>
-    <div class="target">
-      <div class="kv"><div class="k">iCloud-konto (fra denne Mac-en)</div><div class="v" id="appleId">–</div></div>
-      <div class="kv"><div class="k">Kobling til Bilder-appen</div><div class="v" id="osx">–</div></div>
-      <div class="kv"><div class="k">Album i Bilder</div><div class="v"><input type="text" id="album" value="Fra Min Sky" aria-label="Albumnavn"></div></div>
-    </div>
-    <p class="note">Sjekk at <b>iCloud-bilder</b> er slått på i Bilder → Innstillinger → iCloud, og at iCloud-abonnementet har plass til <b id="needSpace">–</b>.</p>
-    <div class="row">
-      <button data-job="prøverunde">Prøverunde (20 bilder)</button>
-      <button class="primary" data-job="flytt" id="moveBtn">Flytt valgte bilder</button>
-      <label class="note"><input type="checkbox" id="retry"> Prøv filer som feilet på nytt</label>
-    </div>
-    <div class="log" id="log" aria-live="polite"></div>
-  </section>
-
-  <!-- 4 -->
-  <section class="card">
-    <div class="step-h"><div class="num" id="n4">4</div><h2>Kontroll: er det trygt å si opp Min Sky?</h2></div>
+  <!-- KONTROLL -->
+  <section class="card panel" id="p-kontroll" role="tabpanel">
+    <h2>Er det trygt å si opp Min Sky?</h2>
+    <p class="lead">Svaret blir JA først når alt er kontrollert og lastet opp. Til da: ikke slett noe i Min Sky.</p>
     <div id="verdict"></div>
     <ul class="checks" id="checks"></ul>
+    <h3>Hvor mange bilder har du i Min Sky?</h3>
     <div class="row">
-      <label for="expected">Antall bilder og videoer Min Sky viser:</label>
-      <input type="number" id="expected" min="0" inputmode="numeric"><button id="saveExpected">Lagre</button>
+      <input type="number" id="expected" min="0" inputmode="numeric" placeholder="f.eks. 20 000" aria-label="Antall bilder og videoer i Min Sky">
+      <button id="saveExpected">Lagre</button>
+      <span style="color:var(--muted);font-size:13px">Tallet står i Min Sky-appen eller på min-sky.no. Det brukes til å sjekke at ingenting mangler.</span>
     </div>
+    <div id="problems"></div>
+    <h3>Kontroller</h3>
     <div class="row">
-      <button data-job="verifiser">Sjekk iCloud-opplasting</button>
+      <button data-job="verifiser">Sjekk iCloud nå</button>
       <button data-job="kontroller-arkiv">Kontroller arkivet</button>
       <button id="report">Lag rapport</button>
-      <button id="openArchive">Åpne arkivet</button>
+      <button id="openArchive">Vis arkivet</button>
     </div>
-    <p class="note" style="margin-top:10px">Arkivet er din fullstendige sikkerhetskopi. Ta gjerne en kopi av det til en ekstern disk, og behold det.</p>
+    <p style="color:var(--muted);font-size:13px;margin-top:12px">Arkivet er en fullstendig, kontrollert kopi av alt fra Min Sky. Ta gjerne en kopi av det til en ekstern disk, og behold det.</p>
   </section>
-  <p class="note">Arbeidsmappe: <code id="root"></code> · versjon <span id="ver"></span></p>
+
+  <!-- LOGG -->
+  <section class="card panel" id="p-logg" role="tabpanel">
+    <h2>Logg</h2>
+    <p class="lead">Alt som skjer. Hele loggen lagres også i arbeidsmappen under <code>logg/</code>.</p>
+    <div class="log" id="log"></div>
+  </section>
+
+  <!-- INNSTILLINGER -->
+  <section class="card panel" id="p-innst" role="tabpanel">
+    <h2>Innstillinger</h2>
+    <h3 style="margin-top:12px">Hvor skal arkivet ligge?</h3>
+    <p class="lead">Arkivet trenger omtrent like mye plass som bildene. Med mye bilder er en ekstern disk ofte best. Settes før du starter.</p>
+    <div class="vols" id="vols"></div>
+    <h3>Bilder og iCloud</h3>
+    <dl class="kv">
+      <dt>iCloud-konto på denne Mac-en</dt><dd id="appleId">–</dd>
+      <dt>Kobling til Bilder-appen</dt><dd id="osx">–</dd>
+      <dt>Album i Bilder</dt><dd><input type="text" id="album" aria-label="Albumnavn"> <button id="saveAlbum">Lagre</button></dd>
+      <dt>Bilder per runde</dt><dd><input type="number" id="gruppe" min="10" max="2000" style="width:100px" aria-label="Bilder per runde"> <button id="saveGruppe">Lagre</button>
+        <div style="color:var(--muted);font-size:13px">500 er raskest for store samlinger. Lavere tall gir hyppigere fremdrift.</div></dd>
+      <dt>Arbeidsmappe</dt><dd><code id="root"></code></dd>
+    </dl>
+    <h3>Snarvei</h3>
+    <div class="row"><button id="shortcut">Lag snarvei på skrivebordet</button><span style="color:var(--muted);font-size:13px">Dobbeltklikk på snarveien for å starte programmet senere.</span></div>
+  </section>
+
+  <p class="foot">Min Sky → iCloud <span id="ver"></span> · kjører bare på denne maskinen</p>
 </main>
 
 <script>
 const TOKEN = "__TOKEN__";
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-let S = null, logSeq = 0, treeKey = "", openFolder = null, polling = null;
+const nf = new Intl.NumberFormat("nb-NO");
+const fmt = (n) => nf.format(n || 0);
+let S = null, logSeq = 0, treeKey = "", openFolder = null, folderOffset = 0, timer = null, tab = "hent";
 
 async function api(path, body) {
   const opt = body === undefined ? {} : { method: "POST", headers: {"Content-Type": "application/json", "X-Token": TOKEN}, body: JSON.stringify(body) };
-  const r = await fetch(path, opt);
-  const data = await r.json().catch(() => ({}));
-  if (!r.ok && data.error) alert(data.error);
-  return data;
+  try {
+    const r = await fetch(path, opt);
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok && data.error) alert(data.error);
+    return data;
+  } catch (e) { setOffline(); return {}; }
 }
+function setOffline() { $("pill").className = "pill bad"; $("pillText").textContent = "Programmet er lukket"; }
 
 const STATE = {
-  i_icloud: ["I iCloud", "ok"], bekreftet: ["Kontrollert", "ok"], importert: ["I Bilder", ""], importerer: ["Importeres", ""],
-  arkivert: ["Venter", ""], feil: ["Feil", "bad"], avvik: ["Avvik", "bad"], i_papirkurv: ["Slettet i Bilder", "bad"], ikke_media: ["Annen fil", ""],
+  i_icloud: ["I iCloud", "ok"], bekreftet: ["Lastes opp", "info"], importert: ["I Bilder", "info"], importerer: ["Importeres", "info"],
+  arkivert: ["Venter", ""], feil: ["Feil", "bad"], avvik: ["Avvik", "bad"], i_papirkurv: ["Slettet i Bilder", "bad"],
 };
-const SRC = { "ferdig": ["Lest inn", "ok"], "ødelagt": ["Ødelagt – last ned på nytt", "bad"], "pågår": ["Påbegynt", "warn"],
-  "ny": ["Ny – ikke lest inn", "warn"], "lastes ned": ["Lastes ned …", ""], "fil": ["Fil", "warn"] };
+const SRC = { "ferdig": ["Lest inn", "ok"], "ryddet": ["Lest inn · zip slettet", "ok"], "ødelagt": ["Ødelagt – last ned på nytt", "bad"],
+  "pågår": ["Leses inn …", "info"], "ny": ["Ny", "warn"], "lastes ned": ["Lastes ned …", ""], "fil": ["Fil", ""] };
 const chip = ([t, c]) => `<span class="chip ${c}">${esc(t)}</span>`;
+const dur = (s) => { if (s == null) return ""; const h = Math.floor(s / 3600), m = Math.round(s % 3600 / 60);
+  return h ? `${h} t ${m} min` : m ? `${m} min` : "under ett minutt"; };
 
+/* ---------- tabs ---------- */
+function showTab(name) {
+  tab = name;
+  document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", t.dataset.tab === name));
+  document.querySelectorAll(".panel").forEach(p => p.classList.toggle("on", p.id === "p-" + name));
+  if (name === "innst") loadVols();
+  if (name === "velg") { treeKey = ""; poll(); }
+  history.replaceState(null, "", "#" + name);
+}
+document.querySelectorAll(".tab").forEach(t => t.onclick = () => showTab(t.dataset.tab));
+
+/* ---------- polling ---------- */
 async function poll() {
+  clearTimeout(timer);
   const s = await api(`/api/status?since=${logSeq}`);
-  if (!s || !s.counts) return;
-  S = s;
-  render(s);
-  const key = `${s.media_unique}|${s.counts.i_icloud}|${s.counts.arkivert}|${s.job ? s.job.name : ""}`;
-  if (key !== treeKey) { treeKey = key; loadTree(); if (openFolder !== null) loadFolder(openFolder); }
-  clearTimeout(polling);
-  polling = setTimeout(poll, s.job ? 1000 : 3000);
+  if (s && s.counts) {
+    S = s; render(s);
+    const key = `${s.media_unique}|${s.done}|${s.counts.arkivert}|${s.counts.importert}|${s.job ? 1 : 0}`;
+    if (tab === "velg" && key !== treeKey) { treeKey = key; loadTree(); if (openFolder !== null) loadFolder(openFolder, folderOffset, true); }
+  }
+  timer = setTimeout(poll, s && s.job ? 1200 : 4000);
+}
+
+function ring(id, from, frac) {
+  const C = 2 * Math.PI * 52, el = $(id);
+  el.style.strokeDasharray = `${Math.max(0, frac) * C} ${C}`;
+  el.style.strokeDashoffset = `${-from * C}`;
 }
 
 function render(s) {
-  const c = s.counts, sel = s.selected || 0;
-  const prob = c.feil + c.avvik + c.i_papirkurv;
-  $("ovNum").textContent = sel ? `${s.done} av ${sel}` : "0";
-  $("ovText").textContent = sel ? "valgte bilder er trygt i iCloud" : "bilder lest inn";
-  const pct = (n) => sel ? Math.min(100, 100 * n / sel) : 0;
-  $("ovBar").innerHTML = [[c.i_icloud, "--s-done"], [c.bekreftet, "--s-verified"], [c.importert + c.importerer, "--s-imported"], [prob, "--s-problem"]]
-    .map(([n, v]) => `<i style="width:${pct(n)}%;background:var(${v})"></i>`).join("");
+  const c = s.counts, sel = s.selected || 0, prob = c.feil + c.avvik + c.i_papirkurv;
+  const inPhotos = c.importert + c.bekreftet + c.importerer, wait = Math.max(0, s.pending - c.importerer);
+  const f = (n) => sel ? n / sel : 0;
+  ring("segDone", 0, f(s.done)); ring("segPhotos", f(s.done), f(inPhotos)); ring("segBad", f(s.done + inPhotos), f(prob));
+  const pct = sel ? Math.floor(100 * s.done / sel) : 0;
+  $("pct").textContent = `${pct} %`;
+  $("stDone").textContent = fmt(s.done); $("stPhotos").textContent = fmt(inPhotos);
+  $("stWait").textContent = fmt(wait); $("stBad").textContent = fmt(prob);
+  $("headline").innerHTML = sel ? `${fmt(s.done)} <span>av ${fmt(sel)} bilder er trygt i iCloud</span>`
+    : s.media_unique ? `Ingen bilder valgt <span>– velg bilder under</span>` : `Klar til å starte <span>– last ned fra Min Sky først</span>`;
 
-  $("inboxPath").textContent = s.inbox_path; $("root").textContent = s.root; $("ver").textContent = s.version;
-  $("inbox").innerHTML = s.inbox.length ? s.inbox.map(f =>
-    `<div class="it"><span>${f.dir ? "📁" : "🗜️"}</span><span class="name">${esc(f.name)}</span><span class="muted">${esc(f.size)}</span>${chip(SRC[f.status] || [f.status, ""])}</div>`).join("")
-    : `<div class="empty">Innboksen er tom. Last ned fra Min Sky og legg zip-filene her.</div>`;
+  const job = s.job, auto = job && job.name === "autopilot";
+  $("phase").innerHTML = job ? `<span class="spin"></span>${esc(job.stopping ? "Setter på pause ved neste trygge punkt …" : (job.phase || job.title))}`
+    : (s.safe ? "✓ Alt er flyttet og kontrollert." : sel && s.done === sel ? "Alle valgte bilder er i iCloud." : "");
+  const m = s.metrics;
+  $("eta").textContent = auto && m.rate ? `${fmt(m.rate)} bilder i minuttet` + (m.eta ? ` · ${m.eta < 60 ? "under ett minutt" : "ca. " + dur(m.eta)} igjen til alt er i Bilder` : "") + " · Mac-en holdes våken"
+    : auto ? "Mac-en holdes våken mens autopiloten går. Du kan lukke nettleseren, men la programvinduet stå." :
+    (sel && s.pending ? `${fmt(s.pending)} bilder venter på å bli lagt inn i Bilder.` : "");
 
-  $("selSummary").textContent = s.media_unique ? `${sel} av ${s.media_unique} valgt (${s.selected_bytes})` : "";
-  $("needSpace").textContent = s.selected_bytes;
-  $("moveBtn").textContent = sel ? `Flytt ${sel} valgte bilder` : "Flytt valgte bilder";
+  const mb = $("mainBtn");
+  if (auto) { mb.textContent = job.stopping ? "Setter på pause …" : "Sett på pause"; mb.disabled = job.stopping; mb.dataset.act = "stop"; }
+  else { mb.textContent = s.done && s.done < sel ? "▶ Fortsett" : "▶ Start"; mb.disabled = !!job || !s.mac.is_mac; mb.dataset.act = "start"; }
+  document.querySelectorAll("[data-job]").forEach(b => b.disabled = !!job);
+  $("trialBtn").hidden = s.done > 0 || !s.media_unique; $("trialBtn").disabled = !!job || !s.mac.is_mac;
+
+  const pill = $("pill");
+  if (job) { pill.className = "pill run"; $("pillText").textContent = auto ? "Autopilot kjører" : job.title; }
+  else if (s.safe) { pill.className = "pill ok"; $("pillText").textContent = "Ferdig"; }
+  else if (prob || (s.last_job && s.last_job.result === "feil")) { pill.className = "pill bad"; $("pillText").textContent = "Trenger tilsyn"; }
+  else { pill.className = "pill"; $("pillText").textContent = s.done ? "På pause" : "Klar"; }
+  document.title = job ? `${pct} % · Min Sky → iCloud` : "Min Sky → iCloud";
+
+  renderAlerts(s, prob);
+  renderHent(s);
+  renderKontroll(s);
+  renderSettings(s);
+  renderLog(s);
+
+  const broken = s.inbox.filter(x => x.status === "ødelagt").length, fresh = s.inbox.filter(x => x.status === "ny").length;
+  badge("bHent", broken ? [broken, "bad"] : fresh ? [fresh, ""] : null);
+  badge("bVelg", s.deselected ? [`${fmt(s.deselected)} valgt bort`, ""] : null);
+  badge("bKontroll", s.safe ? ["✓", "ok"] : prob ? [prob, "bad"] : null);
+  $("ver").textContent = s.version;
+}
+function badge(id, v) { const b = $(id); b.hidden = !v; if (v) { b.textContent = v[0]; b.className = "badge " + v[1]; } }
+
+function renderAlerts(s, prob) {
+  const a = [];
   const m = s.mac;
-  $("appleId").textContent = m.is_mac ? (m.apple_id || "Ikke funnet – logg inn i Systeminnstillinger") : "Krever Mac";
-  $("osx").innerHTML = m.osxphotos ? `<span class="chip ok">Klar</span> <span class="note">${esc(m.osxphotos)}</span>`
-    : `<span class="chip bad">Mangler</span> <span class="note">kjør: pipx install osxphotos</span>`;
-
-  const busy = !!s.job;
-  document.querySelectorAll("[data-job]").forEach(b => b.disabled = busy);
-  ["selAll", "selNone"].forEach(id => $(id).disabled = busy && ["flytt", "prøverunde"].includes(s.job.name));
-  $("running").classList.toggle("on", busy);
-  if (busy) {
-    $("jobTitle").textContent = s.job.stopping ? "Stopper ved neste trygge punkt …" : s.job.title;
-    $("jobTime").textContent = fmtTime(s.job.elapsed); $("stopBtn").disabled = s.job.stopping;
-  }
+  if (!m.is_mac) a.push(["warn", "💻", "Dette er ikke en Mac. Du kan lese inn og velge bilder her, men selve flyttingen til iCloud må gjøres på en Mac."]);
+  else if (!m.osxphotos) a.push(["bad", "🔌", "<b>Koblingen til Bilder-appen mangler.</b> Kjør «Installer.command» på nytt, eller <code>pipx install osxphotos</code> i Terminal.",
+    `<button data-act="recheck">Sjekk igjen</button>`]);
   const lj = s.last_job;
-  $("lastJob").innerHTML = !busy && lj && lj.result === "feil" ? `<div class="banner bad">«${esc(lj.title)}» stoppet med en feil. Se loggen i steg 3.</div>` : "";
+  if (!s.job && lj && lj.result === "feil") a.push(["bad", "⚠️", `<b>«${esc(lj.title)}» stoppet.</b> Se siste linjer i loggen for hva som gikk galt.`, `<button data-tab-go="logg">Vis logg</button>`]);
+  s.disk.warnings.forEach(w => a.push(["warn", "💾", esc(w)]));
+  const broken = s.inbox.filter(x => x.status === "ødelagt");
+  if (broken.length) a.push(["bad", "🧩", `<b>${broken.length} nedlasting${broken.length > 1 ? "er" : ""} er ødelagt eller ufullstendig:</b> ${broken.map(b => esc(b.name)).join(", ")}. Last dem ned på nytt fra Min Sky. Det som var i orden, er allerede tatt vare på.`]);
+  if (prob) a.push(["bad", "🔎", `<b>${fmt(prob)} bilder trenger tilsyn.</b> De ligger trygt i arkivet.`, `<button data-tab-go="kontroll">Se hvilke</button>`]);
+  if (s.downloads.length) a.push(["info", "📥", `Fant <b>${s.downloads.length}</b> zip-fil${s.downloads.length > 1 ? "er" : ""} med bilder i Nedlastinger: ${s.downloads.slice(0, 3).map(d => esc(d.name)).join(", ")}${s.downloads.length > 3 ? " …" : ""}`,
+    `<button data-act="take">Hent dem</button>`]);
+  if (s.safe) a.push(["ok", "🎉", "<b>Alt er flyttet og kontrollert.</b> Behold arkivet, og vent gjerne et par uker før du sier opp Min Sky."]);
+  $("alerts").innerHTML = a.map(([k, i, t, act]) => `<div class="alert ${k}"><span class="ico">${i}</span><span class="txt">${t}</span>${act || ""}</div>`).join("");
+}
 
-  if (s.log.length) {
-    const box = $("log"), atEnd = box.scrollTop + box.clientHeight >= box.scrollHeight - 20;
-    box.insertAdjacentHTML("beforeend", s.log.map(l => `<div class="${l.lvl}"><span class="t">${l.t}</span> ${esc(l.msg)}</div>`).join(""));
-    logSeq = s.log[s.log.length - 1].n;
-    while (box.children.length > 400) box.firstChild.remove();
-    if (atEnd) box.scrollTop = box.scrollHeight;
-  }
-  if (!$("log").children.length) $("log").innerHTML = `<div class="t">Loggen vises her når noe skjer.</div>`;
+function renderHent(s) {
+  if (document.activeElement !== $("autoDl")) $("autoDl").checked = !!s.settings.hent_fra_nedlastinger;
+  $("inbox").innerHTML = s.inbox.length ? s.inbox.map(f =>
+    `<div class="it"><span aria-hidden="true">${f.dir ? "📁" : "🗜️"}</span><span class="name">${esc(f.name)}</span>
+     <span class="meta hide-m">${f.files ? fmt(f.files) + " filer · " : ""}${esc(f.size)}</span>${chip(SRC[f.status] || [f.status, ""])}</div>`).join("")
+    : `<div class="empty">Ingen nedlastinger ennå. Last ned et album fra min-sky.no, så dukker det opp her.</div>`;
+  const cl = s.disk.cleanable, b = $("cleanBtn");
+  b.hidden = !cl.files; b.textContent = `Frigjør ${cl.size}: slett ${cl.files} ferdige zip-filer`;
+}
 
+function renderKontroll(s) {
   $("checks").innerHTML = s.checklist.map(x => `<li class="${x.ok ? "ok" : ""}">${esc(x.text)}</li>`).join("");
   $("verdict").innerHTML = s.safe
-    ? `<div class="verdict yes">JA, alt er flyttet og kontrollert.<small>Behold arkivet, gjerne med en kopi på ekstern disk. Vent gjerne et par uker og sjekk at bildene vises på iPhone før du sier opp.</small></div>`
-    : `<div class="verdict no">NEI, ikke slett noe i Min Sky ennå.<small>${esc(s.next)}</small></div>`;
+    ? `<div class="verdict yes"><span class="big-ico">✅</span><div><b>JA – alt er flyttet og kontrollert</b>Behold arkivet, gjerne med en kopi på ekstern disk. Sjekk at bildene vises på iPhone før du sier opp.</div></div>`
+    : `<div class="verdict no"><span class="big-ico">✋</span><div><b>NEI – ikke slett noe i Min Sky ennå</b>${esc(s.next)}</div></div>`;
   if (document.activeElement !== $("expected") && s.expected != null) $("expected").value = s.expected;
-
-  const srcOk = s.sources.length && s.sources.every(x => x.status === "ferdig");
-  $("n1").classList.toggle("done", !!srcOk && s.media_unique > 0);
-  $("n2").classList.toggle("done", s.media_unique > 0);
-  $("n3").classList.toggle("done", sel > 0 && s.done === sel);
-  $("n4").classList.toggle("done", s.safe);
+  $("problems").innerHTML = s.problems.length ? `<h3>Trenger tilsyn</h3><div class="list">${s.problems.map(p =>
+    `<div class="it"><span class="name" title="${esc(p.path)}">${esc(p.path.split("/").pop())}</span><span class="meta hide-m">${esc(p.error || "")}</span>${chip([p.state, "bad"])}</div>`).join("")}</div>
+    <p style="color:var(--muted);font-size:13px">Filene ligger i arkivet. Du kan dra dem rett inn i Bilder, eller prøve igjen med «Start».</p>` : "";
 }
-const fmtTime = (sec) => sec < 60 ? `${sec} s` : sec < 3600 ? `${Math.floor(sec/60)} min ${sec%60} s` : `${Math.floor(sec/3600)} t ${Math.floor(sec%3600/60)} min`;
 
+function renderSettings(s) {
+  const m = s.mac;
+  $("appleId").textContent = m.is_mac ? (m.apple_id || "Ikke funnet – logg inn i Systeminnstillinger") : "Krever Mac";
+  $("osx").innerHTML = m.osxphotos ? `${chip(["Klar", "ok"])} <span style="color:var(--muted);font-size:13px">${esc(m.osxphotos)}</span>` : chip(["Mangler", "bad"]);
+  if (document.activeElement !== $("album")) $("album").value = s.settings.album || "";
+  if (document.activeElement !== $("gruppe")) $("gruppe").value = s.settings.gruppe || 500;
+  $("root").textContent = s.root;
+}
+
+function renderLog(s) {
+  const box = $("log");
+  if (s.log.length) {
+    const atEnd = box.scrollTop + box.clientHeight >= box.scrollHeight - 20;
+    if (box.dataset.empty) { box.innerHTML = ""; delete box.dataset.empty; }
+    box.insertAdjacentHTML("beforeend", s.log.map(l => `<div class="${l.lvl}"><span class="t">${l.t}</span> ${esc(l.msg)}</div>`).join(""));
+    logSeq = s.log[s.log.length - 1].n;
+    while (box.children.length > 500) box.firstChild.remove();
+    if (atEnd) box.scrollTop = box.scrollHeight;
+  } else if (!box.children.length) { box.dataset.empty = 1; box.innerHTML = `<div class="t">Ingenting her ennå.</div>`; }
+}
+
+/* ---------- selection ---------- */
 async function loadTree() {
   const t = await api("/api/tree");
   if (!Array.isArray(t)) return;
+  const sel = S ? S.selected : 0, all = S ? S.media_unique : 0;
+  $("selSummary").textContent = all ? `${fmt(sel)} av ${fmt(all)} valgt · ${S.selected_bytes}` : "";
   $("tree").innerHTML = t.length ? t.map(n => {
-    const state = n.selected === 0 ? "" : n.selected === n.total ? "checked" : "data-mixed";
-    return `<div class="it ${openFolder === n.path ? "active" : ""}" style="padding-left:${12 + n.depth * 22}px">
-      <input type="checkbox" ${state === "checked" ? "checked" : ""} ${state} data-path="${esc(n.path)}" aria-label="Velg ${esc(n.label)}">
-      <span class="name"><button data-open="${esc(n.path)}" ${n.direct ? "" : "disabled"}>${n.depth ? "📁 " : "🗂️ "}${esc(n.label)}</button></span>
-      <span class="meta">${n.selected} av ${n.total} valgt · ${esc(n.size)}${n.done ? ` · ${n.done} i iCloud` : ""}</span></div>`;
-  }).join("") : `<div class="empty">Ingen bilder lest inn ennå. Gjør steg 1 først.</div>`;
+    const mixed = n.selected > 0 && n.selected < n.total;
+    return `<div class="it ${openFolder === n.path ? "active" : ""}" style="padding-left:${14 + n.depth * 24}px">
+      <input type="checkbox" ${n.selected ? "checked" : ""} ${mixed ? "data-mixed" : ""} data-path="${esc(n.path)}" aria-label="Velg ${esc(n.label)}">
+      <span class="name"><button class="open" data-open="${esc(n.path)}" ${n.direct ? "" : "disabled"}>${n.depth ? "" : "🗂️ "}${esc(n.label)}</button></span>
+      <span class="meta hide-m">${fmt(n.selected)} av ${fmt(n.total)} · ${esc(n.size)}</span>
+      <span class="minibar" title="${fmt(n.done)} i iCloud"><i style="width:${n.total ? 100 * n.done / n.total : 0}%"></i></span></div>`;
+  }).join("") : `<div class="empty">Ingen bilder lest inn ennå. Start under «Last ned».</div>`;
   $("tree").querySelectorAll("input[data-mixed]").forEach(i => i.indeterminate = true);
 }
 
-async function loadFolder(path) {
-  openFolder = path;
-  const f = await api(`/api/folder?path=${encodeURIComponent(path)}`);
+async function loadFolder(path, offset = 0, keep = false) {
+  openFolder = path; folderOffset = offset;
+  const f = await api(`/api/folder?path=${encodeURIComponent(path)}&offset=${offset}`);
   if (!f.items) return;
-  $("folderView").innerHTML = `<div class="row" style="justify-content:space-between"><b>${esc(path.split("/").slice(1).join(" / ") || "Øverste nivå")}</b>
-    <span class="note">${f.total} filer${f.total > f.items.length ? ` (viser ${f.items.length})` : ""} · <button id="closeFolder">Lukk</button></span></div>
-    <div class="grid">${f.items.map(it => `<label class="tile ${it.selected ? "" : "off"}" title="${esc(it.name)} · ${esc(it.size)}${it.date ? " · " + esc(it.date) : ""}">
-      <div class="ph">${it.video ? "🎬<br>" : ""}${esc(it.name)}</div>
-      ${it.preview ? `<img loading="lazy" alt="" src="/api/file?id=${it.id}" onerror="this.remove()">` : ""}
+  const name = path.split("/").slice(1).join(" / ") || path.replace(/__[0-9a-f]{8}$/, "");
+  const tiles = f.items.map(it => `<label class="tile ${it.selected ? "" : "off"}" title="${esc(it.name)} · ${esc(it.size)}${it.date ? " · " + esc(it.date) : ""}">
+      <div class="ph">${it.video ? '<span class="vid">🎬</span>' : ""}${esc(it.name)}</div>
+      ${it.preview ? `<img loading="lazy" alt="${esc(it.name)}" src="/api/file?id=${it.id}" onerror="this.remove()">` : ""}
       <input type="checkbox" data-id="${it.id}" ${it.selected ? "checked" : ""} aria-label="Velg ${esc(it.name)}">
-      <span class="st">${chip(STATE[it.state] || [it.state, ""])}</span></label>`).join("")}</div>`;
-  $("closeFolder").onclick = () => { openFolder = null; $("folderView").innerHTML = ""; loadTree(); };
-  loadTree();
+      ${it.state !== "arkivert" ? `<span class="st">${chip(STATE[it.state] || [it.state, ""])}</span>` : ""}</label>`).join("");
+  const more = f.offset + f.items.length < f.total;
+  $("viewer").innerHTML = `<div class="viewer-h"><b>📁 ${esc(name)}</b><span class="row"><span style="color:var(--muted);font-size:13px">${fmt(f.total)} filer</span>
+      <button id="closeFolder">Lukk</button></span></div><div class="grid">${tiles}</div>
+      <div class="row" style="margin-top:10px;justify-content:center">${f.offset ? `<button data-page="${f.offset - 120}">← Forrige</button>` : ""}
+      ${more || f.offset ? `<span style="color:var(--muted);font-size:13px">${f.offset + 1}–${f.offset + f.items.length} av ${fmt(f.total)}</span>` : ""}
+      ${more ? `<button data-page="${f.offset + 120}">Neste →</button>` : ""}</div>`;
+  $("closeFolder").onclick = () => { openFolder = null; $("viewer").innerHTML = ""; loadTree(); };
+  if (!keep) { loadTree(); $("viewer").scrollIntoView({ behavior: "smooth", block: "nearest" }); }
 }
 
+async function loadVols() {
+  const v = await api("/api/volumes");
+  if (!Array.isArray(v)) return;
+  $("vols").innerHTML = v.map(x => `<button class="vol ${x.current ? "cur" : ""}" data-vol="${esc(x.path)}" ${x.current ? "disabled" : ""}>
+    <b>${x.current ? "✓ " : ""}${esc(x.name)}</b><small>${esc(x.free)} ledig</small></button>`).join("")
+    + `<button class="vol" data-vol="__annen"><b>Annen mappe …</b><small>Skriv inn en sti</small></button>`;
+}
+
+/* ---------- events ---------- */
 document.addEventListener("click", async (e) => {
-  const j = e.target.closest("[data-job]");
-  if (j && !j.disabled) {
-    const name = j.dataset.job;
-    if (name === "flytt" && S && !confirm(`Flytte ${S.selected} bilder (${S.selected_bytes}) til iCloud via Bilder-appen?\n\nDu kan stoppe når som helst og fortsette senere.`)) return;
-    await api("/api/job", { name, album: $("album").value.trim(), retry: $("retry").checked });
-    poll();
+  const t = e.target.closest("button, [data-open]");
+  if (!t) return;
+  if (t.id === "mainBtn") {
+    if (t.dataset.act === "stop") return api("/api/stop", {}).then(poll);
+    if (S && S.selected && !S.done && !confirm(`Flytte ${fmt(S.selected)} bilder (${S.selected_bytes}) til iCloud?\n\nDu kan sette på pause når som helst og fortsette senere. Tips: kjør gjerne en prøverunde med 20 bilder først.`)) return;
+    await api("/api/job", { name: "autopilot" }); return poll();
   }
-  const o = e.target.closest("[data-open]");
-  if (o) loadFolder(o.dataset.open);
+  if (t.dataset.job) { await api("/api/job", { name: t.dataset.job }); if (t.dataset.job === "prøverunde") showTab("logg"); return poll(); }
+  if (t.dataset.open) return loadFolder(t.dataset.open);
+  if (t.dataset.page) return loadFolder(openFolder, Number(t.dataset.page));
+  if (t.dataset.tabGo) return showTab(t.dataset.tabGo);
+  if (t.dataset.act === "take") { await api("/api/take-downloads", { names: S.downloads.map(d => d.name) }); return poll(); }
+  if (t.dataset.act === "recheck") { await api("/api/recheck-mac", {}); return poll(); }
+  if (t.dataset.vol) {
+    let p = t.dataset.vol;
+    if (p === "__annen") { p = prompt("Skriv inn stien til mappen som skal brukes:", S ? S.root : ""); if (!p) return; }
+    else if (!confirm(`Bruke ${p} som arbeidsmappe?\n\nNye nedlastinger og arkivet havner der. Det som allerede er lest inn, blir liggende i den gamle mappen.`)) return;
+    const r = await api("/api/workspace", { path: p }); if (r.ok) { treeKey = ""; logSeq = 0; $("log").innerHTML = ""; loadVols(); poll(); }
+  }
 });
 document.addEventListener("change", async (e) => {
   const t = e.target;
-  if (t.dataset.path !== undefined) { await api("/api/select", { path: t.dataset.path, selected: t.checked }); }
+  if (t.id === "autoDl") { await api("/api/settings", { hent_fra_nedlastinger: t.checked }); return poll(); }
+  if (t.dataset.path !== undefined) await api("/api/select", { path: t.dataset.path, selected: t.checked });
   else if (t.dataset.id) { await api("/api/select", { id: t.dataset.id, selected: t.checked }); t.closest(".tile").classList.toggle("off", !t.checked); }
   else return;
   treeKey = ""; poll();
 });
-$("stopBtn").onclick = () => api("/api/stop", {}).then(poll);
 $("openInbox").onclick = () => api("/api/open", { what: "innboks" });
 $("openArchive").onclick = () => api("/api/open", { what: "arkiv" });
 $("selAll").onclick = () => api("/api/select", { all: true, selected: true }).then(() => { treeKey = ""; poll(); });
 $("selNone").onclick = () => api("/api/select", { all: true, selected: false }).then(() => { treeKey = ""; poll(); });
-$("saveExpected").onclick = () => api("/api/expected", { antall: Number($("expected").value) }).then(poll);
+$("saveExpected").onclick = () => api("/api/expected", { antall: Number(String($("expected").value).replace(/\s/g, "")) }).then(poll);
+$("saveAlbum").onclick = () => api("/api/settings", { album: $("album").value }).then(poll);
+$("saveGruppe").onclick = () => api("/api/settings", { gruppe: Number($("gruppe").value) }).then(poll);
+$("shortcut").onclick = async () => { const r = await api("/api/shortcut", {}); if (r.path) alert(`Snarvei laget:\n${r.path}`); };
 $("report").onclick = async () => { const r = await api("/api/report", {}); if (r.html) alert(`Rapport lagret:\n${r.html}\n${r.csv}`); };
+$("cleanBtn").onclick = async () => {
+  const cl = S.disk.cleanable;
+  if (!confirm(`Slette ${cl.files} zip-filer (${cl.size}) som er ferdig lest inn?\n\nHver fil i dem er kontrollert og ligger i arkivet. Originalene ligger fortsatt i Min Sky.`)) return;
+  const r = await api("/api/clean-inbox", {}); if (r.ok) alert(`Frigjorde ${r.freed}.`); poll();
+};
+{ const h = decodeURIComponent((location.hash || "").slice(1)); showTab($("p-" + h) ? h : "hent"); }
 poll();
 </script>
 </body>

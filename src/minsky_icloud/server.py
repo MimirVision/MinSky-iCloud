@@ -1,20 +1,22 @@
-"""The app: a small web interface served only to this computer (127.0.0.1).
+"""The app: a web interface served only to this computer (127.0.0.1).
 
-Run `minsky-icloud app` and it opens in the browser. All work is done by the
-same code as the command line, in a background thread, so the safety
-guarantees are identical. The Stop button takes effect at the next safe
-point (between files when reading in, between batches when importing).
+Run `minsky-icloud app` (or double-click the desktop shortcut) and it opens
+in the browser. All work runs through the same code as the command line,
+in a background thread, so the safety guarantees are identical. Stop takes
+effect at the next safe point.
 """
 
 from __future__ import annotations
 
 import collections
+import datetime as _dt
 import json
 import logging
 import mimetypes
 import os
 import re
 import secrets
+import shutil
 import subprocess
 import sys
 import threading
@@ -26,7 +28,8 @@ from importlib import resources
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import __version__
+from . import __version__, config, logsetup
+from . import autopilot as A
 from . import ledger as L
 from . import photos as P
 from .ingest import ingest
@@ -41,7 +44,7 @@ PREVIEW_EXT = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif", ".avi
 
 
 class LogBuffer(logging.Handler):
-    def __init__(self, size=400):
+    def __init__(self, size=500):
         super().__init__(logging.INFO)
         self.lines = collections.deque(maxlen=size)
         self.seq = 0
@@ -57,28 +60,50 @@ class LogBuffer(logging.Handler):
                                "lvl": record.levelname.lower(), "msg": msg})
 
 
+# The shared status texts mention terminal commands; in the app, name the buttons instead.
+_UI_WORDS = [
+    (re.compile(r"«minsky-icloud forventet <antall>»|\(kjør: minsky-icloud forventet <antall>\)"),
+     "(skriv inn antallet under)"),
+    (re.compile(r"kjør «minsky-icloud kjør»"), "trykk «Start»"),
+    (re.compile(r"og kjør «minsky-icloud verifiser»( igjen senere)?"), "og trykk «Sjekk iCloud nå»"),
+    (re.compile(r"kjør «minsky-icloud verifiser»( igjen senere)?"), "trykk «Sjekk iCloud nå» senere"),
+    (re.compile(r"kjør «minsky-icloud kontroller-arkiv»"), "trykk «Kontroller arkivet»"),
+    (re.compile(r"\(kjør: minsky-icloud kontroller-arkiv\)"), "(trykk «Kontroller arkivet»)"),
+    (re.compile(r"\(minsky-icloud rapport\)"), "(trykk «Lag rapport»)"),
+]
+
+
+def ui_text(s: str) -> str:
+    for rx, repl in _UI_WORDS:
+        s = rx.sub(repl, s)
+    return s
+
+
 class App:
+    JOBS = {
+        "autopilot": "Autopilot",
+        "prøverunde": "Prøverunde (20 bilder)",
+        "hent": "Leser inn nedlastinger",
+        "verifiser": "Sjekker iCloud-opplasting",
+        "kontroller-arkiv": "Kontrollerer arkivet",
+    }
+
     def __init__(self, ws: Workspace, osxphotos_path: str | None = None):
         self.ws = ws
         self.osxphotos_path = osxphotos_path
+        self.settings = config.load()
         self.token = secrets.token_urlsafe(24)
         self.logbuf = LogBuffer()
         log.addHandler(self.logbuf)
         self.job: dict | None = None
         self.last_job: dict | None = None
         self.job_guard = threading.Lock()
+        self.phase = ""
         self._mac_info: dict | None = None
+        self._dl_cache: dict[tuple, bool] = {}
 
-    # ------------------------------------------------------------- jobs
-    JOBS = {
-        "hent": "Leser inn nedlastinger",
-        "prøverunde": "Prøverunde (20 bilder)",
-        "flytt": "Flytter til iCloud",
-        "verifiser": "Sjekker iCloud-opplasting",
-        "kontroller-arkiv": "Kontrollerer arkivet",
-    }
-
-    def start_job(self, name: str, opts: dict) -> str | None:
+    # ---------------------------------------------------------------- jobs
+    def start_job(self, name: str) -> str | None:
         if name not in self.JOBS:
             return "Ukjent jobb"
         with self.job_guard:
@@ -86,7 +111,8 @@ class App:
                 return "En jobb kjører allerede"
             self.ws.stop_event.clear()
             self.job = {"name": name, "title": self.JOBS[name], "started": time.time(), "stopping": False}
-        threading.Thread(target=self._run, args=(name, opts), daemon=True).start()
+            self.phase = ""
+        threading.Thread(target=self._run, args=(name,), daemon=True).start()
         return None
 
     def stop_job(self):
@@ -99,44 +125,48 @@ class App:
         P.require_macos()
         return P.find_osxphotos(self.osxphotos_path)
 
-    def _run(self, name: str, opts: dict):
+    def _set_phase(self, text: str):
+        self.phase = text
+
+    def _run(self, name: str):
         ws = self.ws
         result = "ok"
         log.info("▶ %s", self.JOBS[name])
         try:
-            if name == "hent":
-                res = ingest(ws)
-                if res.zips_broken:
-                    result = "advarsel"
-            elif name in ("prøverunde", "flytt"):
+            if name == "autopilot":
+                A.run(ws, osxphotos=self._osx(), settings=self.settings, phase=self._set_phase)
+            elif name == "prøverunde":
                 osx = self._osx()
-                log.info("Steg 1/3: leser inn nye nedlastinger")
+                self._set_phase("Leser inn nedlastinger")
                 ingest(ws)
-                log.info("Steg 2/3: legger bildene inn i Bilder-appen")
-                P.import_to_photos(
-                    ws, osxphotos=osx, batch_size=int(opts.get("gruppe") or 100),
-                    limit=20 if name == "prøverunde" else None,
-                    album=opts.get("album", P.DEFAULT_ALBUM) or None,
-                    retry_failed=bool(opts.get("retry")),
-                )
-                log.info("Steg 3/3: kontrollerer bildene i Bilder og iCloud")
+                self._set_phase("Legger 20 bilder inn i Bilder-appen")
+                P.import_to_photos(ws, osxphotos=osx, limit=20, album=self.settings.get("album") or None)
+                self._set_phase("Sjekker bildene i Bilder og iCloud")
                 P.verify_in_photos(ws, osxphotos=osx)
+                log.info("Se etter albumet «%s» i Bilder og sjekk at bildene ser riktige ut.",
+                         self.settings.get("album") or "Alle bilder")
+            elif name == "hent":
+                if ingest(ws).zips_broken:
+                    result = "advarsel"
             elif name == "verifiser":
+                self._set_phase("Sjekker bildene i Bilder og iCloud")
                 P.verify_in_photos(ws, osxphotos=self._osx())
             elif name == "kontroller-arkiv":
+                self._set_phase("Leser hele arkivet og sjekker sjekksummene")
                 if not check_archive(ws):
                     result = "advarsel"
             log.info("✓ Ferdig: %s", self.JOBS[name])
         except Stopped:
             result = "stoppet"
-            log.warning("Stoppet. Ingenting er tapt – trykk på knappen igjen for å fortsette.")
+            log.warning("Satt på pause. Ingenting er tapt. Trykk «Start» for å fortsette.")
         except (NotEnoughSpace, P.OsxphotosMissing, IntegrityError) as e:
             result = "feil"
             log.error(str(e))
+            A.notify("Min Sky → iCloud", "Flyttingen stoppet. Åpne programmet for detaljer.")
         except SystemExit as e:
             result = "feil"
             log.error(str(e))
-        except Exception as e:  # pragma: no cover - shown to the user, full trace in the log file
+        except Exception as e:  # pragma: no cover - full trace goes to the log file
             result = "feil"
             log.error("Uventet feil: %s", e)
             log.debug(traceback.format_exc())
@@ -144,11 +174,13 @@ class App:
             with self.job_guard:
                 self.last_job = {**(self.job or {}), "ended": time.time(), "result": result}
                 self.job = None
+                self.phase = ""
 
-    # ------------------------------------------------------------ views
-    def mac_info(self) -> dict:
-        if self._mac_info is None:
-            info = {"is_mac": sys.platform == "darwin", "apple_id": None, "osxphotos": None}
+    # --------------------------------------------------------------- status
+    def mac_info(self, refresh: bool = False) -> dict:
+        if self._mac_info is None or refresh:
+            info = {"is_mac": sys.platform == "darwin" or bool(os.environ.get("MINSKY_TILLAT_IKKE_MAC")),
+                    "apple_id": None, "osxphotos": None}
             if info["is_mac"]:
                 try:
                     out = subprocess.run(["defaults", "read", "MobileMeAccounts", "Accounts"],
@@ -159,51 +191,139 @@ class App:
                     pass
             try:
                 osx = P.find_osxphotos(self.osxphotos_path)
-                v = subprocess.run([*osx, "--version"], capture_output=True, text=True, timeout=30)
+                v = subprocess.run([*osx, "--version"], capture_output=True, text=True, timeout=60)
                 info["osxphotos"] = (v.stdout or v.stderr).strip() or None
             except Exception:
                 info["osxphotos"] = None
             self._mac_info = info
         return self._mac_info
 
+    def metrics(self, pending: int) -> dict:
+        """Import speed over the last 15 minutes and a time estimate."""
+        db = self.ws.ledger.db
+        cutoff = (_dt.datetime.now().astimezone() - _dt.timedelta(minutes=15)).isoformat(timespec="seconds")
+        rows = [r[0] for r in db.execute(
+            "SELECT imported_at FROM items WHERE imported_at >= ? ORDER BY imported_at", (cutoff,))]
+        rate = None
+        if len(rows) >= 5:
+            try:
+                first = _dt.datetime.fromisoformat(rows[0])
+                span = max(60.0, (_dt.datetime.now().astimezone() - first).total_seconds())
+                rate = len(rows) / span * 60  # per minute
+            except ValueError:
+                rate = None
+        eta = int(pending / rate * 60) if rate and pending else None
+        return {"rate": round(rate) if rate else None, "eta": eta}
+
+    def disk(self, g) -> dict:
+        ws = self.ws
+        db = ws.ledger.db
+        not_read = 0
+        known = {s["path"]: s["status"] for s in g["sources"]}
+        for p in ws.inbox.iterdir() if ws.inbox.exists() else []:
+            if p.is_file() and p.suffix.lower() == ".zip" and known.get(p.name) != "ferdig":
+                not_read += p.stat().st_size
+        to_import = db.execute(
+            "SELECT COALESCE(SUM(size),0) FROM items WHERE state IN (?,?) AND selected=1",
+            (L.ARKIVERT, L.IMPORTERER)).fetchone()[0]
+        free_ws = free_bytes(ws.archive)
+        free_home = free_bytes(Path.home())
+        same = _same_disk(ws.archive, Path.home())
+        need_ws = not_read + (to_import if same else 0)
+        warn = []
+        if need_ws + 2 * 1024**3 > free_ws:
+            warn.append(f"Disken med arbeidsmappen har {human(free_ws)} ledig, men trenger ca. {human(need_ws)}. "
+                        "Slå på «Optimaliser Mac-lagring» i Bilder → Innstillinger → iCloud, frigjør plass "
+                        "eller flytt arbeidsmappen til en ekstern disk (Innstillinger nederst).")
+        if not same and to_import + 5 * 1024**3 > free_home:
+            warn.append(f"Mac-ens hoveddisk (Bilder-biblioteket) har {human(free_home)} ledig, men trenger "
+                        f"ca. {human(to_import)}. Slå på «Optimaliser Mac-lagring» i Bilder → Innstillinger → iCloud.")
+        return {"free_ws": human(free_ws), "free_home": human(free_home), "same_disk": same,
+                "need_ws": human(need_ws), "need_home": human(to_import), "warnings": warn,
+                "cleanable": self.cleanable(g)}
+
+    def cleanable(self, g) -> dict:
+        n = size = 0
+        for s in g["sources"]:
+            if s["kind"] != "zip" or s["status"] != "ferdig":
+                continue
+            try:
+                st = (self.ws.inbox / s["path"]).stat()
+            except OSError:
+                continue
+            if st.st_size == s["size"]:
+                n += 1
+                size += st.st_size
+        return {"files": n, "size": human(size), "bytes": size}
+
+    def downloads_candidates(self) -> list[dict]:
+        """Photo zips in Downloads that autopilot will not pick up by itself
+        (downloaded before automatic pickup was switched on)."""
+        d = A.downloads_dir()
+        out = []
+        if not d.is_dir():
+            return out
+        since = self.settings.get("nedlastinger_fra") or time.time()
+        for p in sorted(d.iterdir()):
+            if p.suffix.lower() != ".zip" or not p.is_file():
+                continue
+            try:
+                st = p.stat()
+            except OSError:
+                continue
+            if self.settings.get("hent_fra_nedlastinger") and st.st_mtime >= since:
+                continue  # autopilot takes these
+            key = (p.name, st.st_size, st.st_mtime)
+            if key not in self._dl_cache:
+                self._dl_cache[key] = A.looks_like_photo_zip(p)
+            if self._dl_cache[key]:
+                out.append({"name": p.name, "size": human(st.st_size)})
+        return out
+
     def status(self, since: int = 0) -> dict:
         ws = self.ws
         g = gather(ws)
         db = ws.ledger.db
-        selected_media = db.execute(
-            "SELECT COUNT(*), COALESCE(SUM(size),0) FROM items WHERE is_media=1 AND selected=1"
-        ).fetchone()
-        done = g["counts"][L.I_ICLOUD]
+        c = g["counts"]
+        sel = db.execute(
+            "SELECT COUNT(*), COALESCE(SUM(size),0) FROM items WHERE is_media=1 AND selected=1").fetchone()
+        pending = A.pending_selected(ws)
         with self.job_guard:
             job = dict(self.job) if self.job else None
             last = dict(self.last_job) if self.last_job else None
         if job:
             job["elapsed"] = int(time.time() - job["started"])
+            job["phase"] = self.phase
         with self.logbuf.guard:
             lines = [ln for ln in self.logbuf.lines if ln["n"] > since]
         checks = checklist(g)
+        problems = db.execute(
+            "SELECT archive_path, state, last_error FROM items WHERE state IN (?,?,?) ORDER BY archive_path LIMIT 50",
+            (L.FEIL, L.AVVIK, L.I_PAPIRKURV)).fetchall()
         return {
             "version": __version__,
             "root": str(ws.root),
             "inbox_path": str(ws.inbox),
-            "counts": g["counts"],
-            "labels": LABELS,
+            "counts": c,
             "media_unique": g["media_unique"],
             "media_bytes": human(g["media_bytes"]),
-            "selected": selected_media[0],
-            "selected_bytes": human(selected_media[1]),
+            "selected": sel[0],
+            "selected_bytes": human(sel[1]),
             "deselected": g["deselected"],
-            "done": done,
+            "pending": pending,
+            "done": c[L.I_ICLOUD],
             "expected": g["expected"],
             "checklist": [{"ok": ok, "text": ui_text(t)} for ok, t in checks],
             "safe": all(ok for ok, _ in checks),
             "next": ui_text(next_step(g)),
-            "sources": [
-                {"path": s["path"], "status": s["status"], "files": s["files"], "error": s["error"]}
-                for s in g["sources"]
-            ],
             "inbox": self.inbox_listing(g["sources"]),
-            "free": human(free_bytes(ws.archive)),
+            "problems": [{"path": r["archive_path"], "state": LABELS.get(r["state"], r["state"]),
+                          "error": r["last_error"]} for r in problems],
+            "metrics": self.metrics(pending),
+            "disk": self.disk(g),
+            "downloads": self.downloads_candidates(),
+            "downloads_dir": str(A.downloads_dir()),
+            "settings": {k: self.settings.get(k) for k in ("album", "gruppe", "hent_fra_nedlastinger")},
             "job": job,
             "last_job": last,
             "log": lines,
@@ -211,7 +331,7 @@ class App:
         }
 
     def inbox_listing(self, sources) -> list[dict]:
-        known = {s["path"]: s["status"] for s in sources}
+        known = {s["path"]: s for s in sources}
         out = []
         try:
             entries = sorted(self.ws.inbox.iterdir(), key=lambda p: p.name.lower())
@@ -220,21 +340,28 @@ class App:
         for p in entries:
             if p.name.startswith("."):
                 continue
-            rel = p.name
+            src = known.get(p.name)
             if p.is_dir():
                 size = sum(f.stat().st_size for f in p.rglob("*") if f.is_file())
-                status = known.get(rel, "ny")
+                status = src["status"] if src else "ny"
             else:
                 size = p.stat().st_size
                 if p.suffix.lower() in PARTIAL_SUFFIXES:
                     status = "lastes ned"
                 else:
-                    status = known.get(rel, "ny" if p.suffix.lower() == ".zip" else "fil")
-            out.append({"name": rel, "size": human(size), "dir": p.is_dir(), "status": status})
+                    status = src["status"] if src else ("ny" if p.suffix.lower() == ".zip" else "fil")
+            out.append({"name": p.name, "size": human(size), "dir": p.is_dir(), "status": status,
+                        "files": src["files"] if src else None, "error": src["error"] if src else None})
+        # Zips that were cleaned up after being read in still count.
+        listed = {o["name"] for o in out}
+        for s in sources:
+            if s["kind"] == "zip" and s["path"] not in listed and s["status"] == "ferdig":
+                out.append({"name": s["path"], "size": human(s["size"]), "dir": False, "status": "ryddet",
+                            "files": s["files"], "error": None})
         return out
 
+    # ------------------------------------------------------------ selection
     def tree(self) -> list[dict]:
-        """Folder tree of the archive with counts, for choosing what to move."""
         db = self.ws.ledger.db
         nodes: dict[str, dict] = {}
         for r in db.execute("SELECT archive_path, size, state, selected FROM items WHERE is_media=1"):
@@ -267,7 +394,7 @@ class App:
         rows = [r for r in rows if r["archive_path"].rsplit("/", 1)[0] == path]
         page = rows[offset:offset + limit]
         return {
-            "path": path, "total": len(rows),
+            "path": path, "total": len(rows), "offset": offset,
             "items": [{
                 "id": r["sha256"], "name": r["archive_path"].rsplit("/", 1)[-1],
                 "size": human(r["size"]), "state": r["state"], "selected": bool(r["selected"]),
@@ -285,41 +412,132 @@ class App:
             elif body.get("all"):
                 n = db.execute("UPDATE items SET selected=?", (val,)).rowcount
             else:
-                path = body.get("path") or ""
-                n = db.execute(
-                    "UPDATE items SET selected=? WHERE archive_path LIKE ? ESCAPE '\\'",
-                    (val, _like_prefix(path)),
-                ).rowcount
+                n = db.execute("UPDATE items SET selected=? WHERE archive_path LIKE ? ESCAPE '\\'",
+                               (val, _like_prefix(body.get("path") or ""))).rowcount
             self.ws.ledger.event("utvalg", json.dumps({**body, "endret": n}, ensure_ascii=False))
         return n
 
+    # --------------------------------------------------------------- actions
+    def save_settings(self, body: dict) -> None:
+        if "album" in body:
+            self.settings["album"] = str(body["album"]).strip()[:100]
+        if "gruppe" in body:
+            self.settings["gruppe"] = max(10, min(2000, int(body["gruppe"])))
+        if "hent_fra_nedlastinger" in body:
+            on = bool(body["hent_fra_nedlastinger"])
+            self.settings["hent_fra_nedlastinger"] = on
+            if on and not self.settings.get("nedlastinger_fra"):
+                self.settings["nedlastinger_fra"] = time.time()
+        config.save(self.settings)
+
+    def take_downloads(self, names: list[str]) -> int:
+        """Move chosen photo zips from Downloads into the inbox (the user's explicit choice)."""
+        d = A.downloads_dir()
+        n = 0
+        for name in names:
+            p = d / Path(name).name
+            if not p.is_file() or p.suffix.lower() != ".zip" or not A.looks_like_photo_zip(p):
+                continue
+            dest = self.ws.inbox / p.name
+            k = 2
+            while dest.exists():
+                dest = self.ws.inbox / f"{p.stem} ({k}){p.suffix}"
+                k += 1
+            shutil.move(str(p), str(dest))
+            log.info("Hentet %s fra Nedlastinger", p.name)
+            n += 1
+        return n
+
+    def clean_inbox(self) -> dict:
+        """Delete zips that are completely read in. Every file from the zip is
+        first checked to be in the archive with the right size."""
+        ws = self.ws
+        db = ws.ledger.db
+        removed, freed = [], 0
+        for s in db.execute("SELECT * FROM sources WHERE kind='zip' AND status='ferdig'").fetchall():
+            p = ws.inbox / s["path"]
+            try:
+                st = p.stat()
+            except OSError:
+                continue
+            if st.st_size != s["size"]:
+                continue
+            ok = True
+            for r in db.execute(
+                "SELECT i.archive_path, i.size FROM occurrences o JOIN items i ON i.sha256=o.sha256 "
+                "WHERE o.source_id=?", (s["id"],)):
+                a = ws.archive_abs(r["archive_path"])
+                if not a.exists() or a.stat().st_size != r["size"]:
+                    ok = False
+                    break
+            if not ok:
+                log.warning("Beholder %s: arkivet mangler filer fra den.", s["path"])
+                continue
+            p.unlink()
+            removed.append(s["path"])
+            freed += st.st_size
+        with ws.ledger.tx():
+            ws.ledger.event("rydd_innboks", json.dumps(removed, ensure_ascii=False))
+        log.info("Ryddet innboksen: slettet %d ferdige zip-filer og frigjorde %s.", len(removed), human(freed))
+        return {"files": len(removed), "freed": human(freed)}
+
+    def volumes(self) -> list[dict]:
+        out = []
+        cands = [Path.home()]
+        vol = Path("/Volumes")
+        if vol.is_dir():
+            cands += [p for p in sorted(vol.iterdir()) if p.is_dir() and not p.name.startswith(".")]
+        seen = set()
+        for c in cands:
+            try:
+                dev = os.stat(c).st_dev
+            except OSError:
+                continue
+            if dev in seen:
+                continue  # the system disk also shows up under /Volumes
+            seen.add(dev)
+            target = c / "MinSky-flytting"
+            out.append({"name": "Denne Mac-en" if c == Path.home() else c.name,
+                        "path": str(target), "free": human(free_bytes(c)),
+                        "current": self.ws.root == target.resolve()})
+        return out
+
+    def switch_workspace(self, path: str) -> str | None:
+        if self.job:
+            return "Sett flyttingen på pause først."
+        new_root = Path(path).expanduser()
+        try:
+            new_root.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            return f"Kan ikke bruke {new_root}: {e}"
+        new = Workspace(new_root)
+        try:
+            new.open()
+        except SystemExit as e:
+            return str(e)
+        old = self.ws
+        self.ws = new
+        old.close()
+        logsetup.attach_file(new)
+        self.settings["mappe"] = str(new.root)
+        config.save(self.settings)
+        log.info("Arbeidsmappe: %s", new.root)
+        return None
+
     def open_path(self, what: str) -> None:
-        target = {
-            "innboks": self.ws.inbox, "arkiv": self.ws.archive, "mappe": self.ws.root,
-            "rapporter": self.ws.reports,
-        }.get(what)
+        target = {"innboks": self.ws.inbox, "arkiv": self.ws.archive, "mappe": self.ws.root,
+                  "rapporter": self.ws.reports, "nedlastinger": A.downloads_dir()}.get(what)
         if target and sys.platform == "darwin":
             subprocess.run(["open", str(target)], check=False)
         elif target and sys.platform.startswith("win"):
             os.startfile(str(target))  # type: ignore[attr-defined]
 
 
-# The shared status texts mention terminal commands; in the app, name the buttons instead.
-_UI_WORDS = [
-    (re.compile(r"«minsky-icloud forventet <antall>»|\(kjør: minsky-icloud forventet <antall>\)"),
-     "(skriv inn antallet under)"),
-    (re.compile(r"kjør «minsky-icloud kjør»"), "trykk «Flytt valgte bilder» i steg 3"),
-    (re.compile(r"kjør «minsky-icloud verifiser»( igjen senere)?"), "trykk «Sjekk iCloud-opplasting» senere"),
-    (re.compile(r"kjør «minsky-icloud kontroller-arkiv»"), "trykk «Kontroller arkivet»"),
-    (re.compile(r"\(kjør: minsky-icloud kontroller-arkiv\)"), "(trykk «Kontroller arkivet»)"),
-    (re.compile(r"\(minsky-icloud rapport\)"), "(trykk «Lag rapport»)"),
-]
-
-
-def ui_text(s: str) -> str:
-    for rx, repl in _UI_WORDS:
-        s = rx.sub(repl, s)
-    return s
+def _same_disk(a: Path, b: Path) -> bool:
+    try:
+        return os.stat(a).st_dev == os.stat(b).st_dev
+    except OSError:
+        return True
 
 
 def _pretty_source(name: str) -> str:
@@ -332,14 +550,28 @@ def _like_prefix(path: str) -> str:
     return esc + "/%"
 
 
+def make_shortcut() -> Path:
+    """A double-clickable launcher on the Desktop."""
+    import shlex
+
+    exe = shutil.which("minsky-icloud")
+    cmd = shlex.quote(exe) if exe else f"{shlex.quote(sys.executable)} -m minsky_icloud"
+    desk = Path.home() / "Desktop"
+    desk.mkdir(parents=True, exist_ok=True)
+    p = desk / "Min Sky til iCloud.command"
+    p.write_text("#!/bin/bash\n# Starter Min Sky → iCloud. La vinduet stå åpent mens programmet brukes.\n"
+                 f"exec {cmd} app\n", encoding="utf-8")
+    p.chmod(0o755)
+    return p
+
+
 class Handler(BaseHTTPRequestHandler):
-    app: App  # set on the subclass
+    app: App
     server_version = "MinSkyICloud"
 
-    def log_message(self, fmt, *args):  # keep the terminal quiet
+    def log_message(self, fmt, *args):
         pass
 
-    # --------------------------------------------------------- helpers
     def _host_ok(self) -> bool:
         # Refuse requests that arrive under a foreign host name (DNS rebinding).
         host = (self.headers.get("Host") or "").split(":")[0]
@@ -357,10 +589,8 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _json(self, data, code=200):
-        self._send(code, json.dumps(data, ensure_ascii=False).encode("utf-8"),
-                   "application/json; charset=utf-8")
+        self._send(code, json.dumps(data, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8")
 
-    # ------------------------------------------------------------- GET
     def do_GET(self):
         if not self._host_ok():
             return self._send(403, b"forbidden", "text/plain")
@@ -372,7 +602,7 @@ class Handler(BaseHTTPRequestHandler):
                 page = resources.files("minsky_icloud").joinpath("ui/index.html").read_text("utf-8")
                 page = page.replace("__TOKEN__", app.token)
                 return self._send(200, page.encode("utf-8"), "text/html; charset=utf-8", {
-                    "Content-Security-Policy": "default-src 'self'; img-src 'self' blob:; "
+                    "Content-Security-Policy": "default-src 'self'; img-src 'self' blob: data:; "
                     "style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'"})
             if u.path == "/api/status":
                 return self._json(app.status(int(q.get("since", 0))))
@@ -380,6 +610,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(app.tree())
             if u.path == "/api/folder":
                 return self._json(app.folder(q.get("path", ""), int(q.get("offset", 0))))
+            if u.path == "/api/volumes":
+                return self._json(app.volumes())
             if u.path == "/api/file":
                 return self._file(q.get("id", ""))
         except Exception as e:
@@ -405,7 +637,6 @@ class Handler(BaseHTTPRequestHandler):
             while chunk := f.read(1024 * 256):
                 self.wfile.write(chunk)
 
-    # ------------------------------------------------------------ POST
     def do_POST(self):
         if not self._host_ok() or self.headers.get("X-Token") != self.app.token:
             return self._send(403, b"forbidden", "text/plain")
@@ -415,19 +646,23 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError:
             return self._json({"error": "ugyldig forespørsel"}, 400)
         app = self.app
-        u = urlparse(self.path)
+        path = urlparse(self.path).path
+        busy_import = app.job and app.job["name"] in ("autopilot", "prøverunde")
         try:
-            if u.path == "/api/job":
-                err = app.start_job(body.get("name", ""), body)
+            if path == "/api/job":
+                err = app.start_job(body.get("name", ""))
                 return self._json({"ok": err is None, "error": err}, 200 if err is None else 409)
-            if u.path == "/api/stop":
+            if path == "/api/stop":
                 app.stop_job()
                 return self._json({"ok": True})
-            if u.path == "/api/select":
-                if app.job and app.job["name"] in ("prøverunde", "flytt"):
-                    return self._json({"error": "Stopp flyttingen før du endrer utvalget"}, 409)
+            if path == "/api/select":
+                if busy_import:
+                    return self._json({"error": "Sett flyttingen på pause før du endrer utvalget."}, 409)
                 return self._json({"ok": True, "changed": app.select(body)})
-            if u.path == "/api/expected":
+            if path == "/api/settings":
+                app.save_settings(body)
+                return self._json({"ok": True})
+            if path == "/api/expected":
                 n = int(body.get("antall"))
                 if n < 0:
                     raise ValueError
@@ -435,10 +670,23 @@ class Handler(BaseHTTPRequestHandler):
                     app.ws.ledger.set_meta("forventet_antall", str(n))
                     app.ws.ledger.event("forventet", str(n))
                 return self._json({"ok": True})
-            if u.path == "/api/open":
+            if path == "/api/take-downloads":
+                return self._json({"ok": True, "moved": app.take_downloads(list(body.get("names") or []))})
+            if path == "/api/clean-inbox":
+                if app.job and app.job["name"] in ("autopilot", "hent"):
+                    return self._json({"error": "Sett flyttingen på pause først."}, 409)
+                return self._json({"ok": True, **app.clean_inbox()})
+            if path == "/api/workspace":
+                err = app.switch_workspace(str(body.get("path") or ""))
+                return self._json({"ok": err is None, "error": err}, 200 if err is None else 409)
+            if path == "/api/shortcut":
+                return self._json({"ok": True, "path": str(make_shortcut())})
+            if path == "/api/open":
                 app.open_path(body.get("what", ""))
                 return self._json({"ok": True})
-            if u.path == "/api/report":
+            if path == "/api/recheck-mac":
+                return self._json(app.mac_info(refresh=True))
+            if path == "/api/report":
                 c, h = write_reports(app.ws)
                 if sys.platform == "darwin":
                     subprocess.run(["open", str(h)], check=False)
@@ -466,7 +714,7 @@ def serve(ws: Workspace, *, port: int = 8765, open_browser: bool = True,
     httpd.daemon_threads = True
     url = f"http://127.0.0.1:{httpd.server_address[1]}/"
     print(f"Min Sky → iCloud kjører på {url}")
-    print("La dette vinduet stå åpent. Trykk Ctrl+C her for å avslutte.")
+    print("La dette vinduet stå åpent. Lukk det (eller trykk Ctrl+C) for å avslutte.")
     if open_browser:
         threading.Timer(0.5, lambda: webbrowser.open(url)).start()
     try:
@@ -474,10 +722,11 @@ def serve(ws: Workspace, *, port: int = 8765, open_browser: bool = True,
     except KeyboardInterrupt:
         print("\nAvslutter …")
         app.stop_job()
-        for _ in range(100):  # let a running job reach its next safe point
+        for _ in range(100):
             if not app.job:
                 break
             time.sleep(0.1)
     finally:
         httpd.server_close()
+        app.ws.close()
     return 0

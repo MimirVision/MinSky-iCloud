@@ -10,6 +10,7 @@ import subprocess
 import sys
 
 from . import __version__
+from . import logsetup
 from . import photos as P
 from .ingest import ingest
 from .report import check_archive, print_status, write_reports
@@ -19,20 +20,6 @@ from .workspace import Workspace
 log = logging.getLogger("minsky")
 
 ALIASES = {"kjor": "kjør", "kontroller": "kontroller-arkiv"}
-
-
-def _setup_logging(ws: Workspace, verbose: bool) -> None:
-    ws.ensure()
-    log.setLevel(logging.DEBUG)
-    log.handlers.clear()
-    fh = logging.FileHandler(ws.logs / "minsky-icloud.log", encoding="utf-8")
-    fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
-    fh.setLevel(logging.DEBUG)
-    ch = logging.StreamHandler(sys.stdout)
-    ch.setFormatter(logging.Formatter("%(message)s"))
-    ch.setLevel(logging.DEBUG if verbose else logging.INFO)
-    log.addHandler(fh)
-    log.addHandler(ch)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -49,6 +36,7 @@ def build_parser() -> argparse.ArgumentParser:
     appp = sub.add_parser("app", help="åpne programmet i nettleseren (anbefalt)")
     appp.add_argument("--port", type=int, default=8765)
     appp.add_argument("--ikke-åpne", dest="no_browser", action="store_true", help="ikke åpne nettleseren")
+    sub.add_parser("snarvei", help="lag en snarvei på skrivebordet som starter programmet")
     sub.add_parser("sjekk", help="sjekk at alt er klart (Mac, osxphotos, diskplass)")
     sub.add_parser("hent", help="les inn det som er lastet ned til innboksen og arkiver det trygt")
 
@@ -71,7 +59,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _import_args(p):
     p.add_argument("--antall", type=int, help="importer bare så mange (fint for en prøverunde)")
-    p.add_argument("--gruppe", type=int, default=100, help="filer per runde mot Bilder (standard 100)")
+    p.add_argument("--gruppe", type=int, default=500, help="filer per runde mot Bilder (standard 500)")
     p.add_argument("--album", default=P.DEFAULT_ALBUM,
                    help=f'album i Bilder som får alle bildene (standard "{P.DEFAULT_ALBUM}", "" for intet)')
     p.add_argument("--prøv-feil-igjen", dest="retry", action="store_true",
@@ -88,7 +76,7 @@ def main(argv: list[str] | None = None) -> int:
         args = ap.parse_args(argv)
 
     ws = Workspace(args.mappe)
-    _setup_logging(ws, args.detaljert)
+    logsetup.setup(ws, args.detaljert)
     log.debug("Start: %s (versjon %s)", " ".join(argv), __version__)
     try:
         with ws:
@@ -110,6 +98,11 @@ def _dispatch(ws: Workspace, args) -> int:
         from .server import serve
 
         return serve(ws, port=args.port, open_browser=not args.no_browser, osxphotos_path=args.osxphotos)
+    if cmd == "snarvei":
+        from .server import make_shortcut
+
+        log.info("Snarvei laget: %s", make_shortcut())
+        return 0
     if cmd == "sjekk":
         return doctor(ws, args)
     if cmd == "hent":

@@ -82,13 +82,16 @@ def cmd_import(args):
             rec["error"] = True
             records.append(rec)
             continue
+        if os.environ.get("FAKE_DELAY"):
+            import time
+            time.sleep(float(os.environ["FAKE_DELAY"]))
         u = str(uuidlib.uuid4()).upper()
         dst = STORE / f"{u}{Path(f).suffix}"
         shutil.copyfile(f, dst)
         lib["assets"][u] = {
             "uuid": u, "fingerprint": fp, "path": str(dst),
             "original_filesize": os.path.getsize(f), "intrash": False,
-            "incloud": os.environ.get("FAKE_INCLOUD") == "1", "iscloudasset": True,
+            "incloud": os.environ.get("FAKE_INCLOUD") == "1" or (os.environ.get("FAKE_INCLOUD") == "delvis" and len(lib["assets"]) % 3 != 0), "iscloudasset": True,
             "path_live_photo": None,
         }
         save(lib)

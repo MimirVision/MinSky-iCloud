@@ -62,7 +62,7 @@ def find_osxphotos(explicit: str | None = None) -> list[str]:
 # --------------------------------------------------------------------- import
 
 
-def import_to_photos(ws: Workspace, *, osxphotos: list[str], batch_size: int = 100,
+def import_to_photos(ws: Workspace, *, osxphotos: list[str], batch_size: int = 500,
                      limit: int | None = None, album: str | None = DEFAULT_ALBUM,
                      retry_failed: bool = False) -> dict[str, int]:
     db = ws.ledger.db

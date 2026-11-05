@@ -26,7 +26,10 @@ class Workspace:
     """
 
     def __init__(self, root: Path | str | None = None):
-        root = root or os.environ.get("MINSKY_MAPPE") or DEFAULT_DIR
+        if not root:
+            from . import config
+
+            root = os.environ.get("MINSKY_MAPPE") or config.load().get("mappe") or DEFAULT_DIR
         self.root = Path(root).expanduser().resolve()
         self.inbox = self.root / "innboks"
         self.archive = self.root / "arkiv"

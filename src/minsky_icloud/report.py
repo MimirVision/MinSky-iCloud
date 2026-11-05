@@ -58,7 +58,7 @@ def gather(ws: Workspace) -> dict:
 def checklist(g: dict) -> list[tuple[bool, str]]:
     c = g["counts"]
     broken = [s for s in g["sources"] if s["status"] != "ferdig"]
-    pending = c[L.ARKIVERT] - g["deselected"] + c[L.IMPORTERER] + c[L.IMPORTERT] + c[L.BEKREFTET]
+    pending = c[L.ARKIVERT] - g["deselected"] + c[L.IMPORTERER] + c[L.IMPORTERT]  # BEKREFTET = checked, uploading
     problems = c[L.FEIL] + c[L.AVVIK] + c[L.I_PAPIRKURV]
     items = [
         (g["media_unique"] > 0, f"Bilder/videoer funnet i nedlastingene: {g['media_unique']}"),
